@@ -4,9 +4,8 @@ CFLAGS += -Wall
 
 CFLAGS += -Ibuild/include
 LDFLAGS += -Lbuild/lib -llua
-# FRAMEWORKS = -framework IOKit -framework Cocoa -framework OpenGL
 
-.PHONY: all clean run
+.PHONY: all install clean
 
 all: build/$(TARGET)
 

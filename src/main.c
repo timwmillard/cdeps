@@ -126,10 +126,12 @@ void cmd_build(Config *config) {
     }
 
     chdir(config->location);
+    int deps_dir = save_cwd();
 
     printf("Building dependencies ...\n");
     char cmd[2048];
     for (int i = 0; i < config->num_deps; i++) {
+        restore_cwd(deps_dir);
         Dependency dep = config->deps[i];
         File file = file_from_url(dep.url);
 
@@ -145,6 +147,7 @@ void cmd_build(Config *config) {
         snprintf(cmd, 1024, "%s", dep.build);
         system(cmd);
     }
+    close_cwd(deps_dir);
 }
 
 void cmd_install(Config *config) {

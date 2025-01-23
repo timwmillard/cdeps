@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-char *parse_filename(const char *url);
+#include "util.h"
 
 // Structure to hold dependency info
 typedef struct {
@@ -104,7 +104,9 @@ Config *read_config(const char *filename) {
             deps[i-1].build = get_string_field(L, "build");
             
             if (deps[i-1].name == NULL) {
-                deps[i-1].name = parse_filename(url);
+                File file = file_from_url(url);
+                deps[i-1].name = file.name;
+                free_file(file);
             }
             if (deps[i-1].version == NULL) {
                 deps[i-1].version = strdup("latest");

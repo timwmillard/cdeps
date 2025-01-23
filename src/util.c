@@ -4,7 +4,30 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
+#include "util.h"
+
+int save_cwd() {
+    int saved_dir_fd = open(".", O_RDONLY);
+    if (saved_dir_fd == -1) {
+        perror("open");
+        return -1;
+    }
+    return saved_dir_fd;
+}
+
+// Return to saved directory
+void restore_cwd(int saved_dir_fd) {
+    if (fchdir(saved_dir_fd) == -1) {
+        perror("fchdir");
+    }
+}
+
+void close_cwd(int saved_dir_fd) {
+    close(saved_dir_fd);
+}
 
 bool is_dir(const char *path)
 {
@@ -27,10 +50,6 @@ bool is_installed(char *program) {
     return found;
 }
 
-typedef struct {
-    char *name;
-    char *ext;
-} File;
 
 File file_from_url(const char *url) {
     // Get the filename first (everything after last '/')
@@ -59,6 +78,7 @@ File file_from_url(const char *url) {
     // Find last occurrence of '.'
     const char *ext = strrchr(filename, '.');
     if (!ext) {
+        parts.name = strdup(filename);
         return parts; // No extension found
     }
 
@@ -105,24 +125,5 @@ int mkdirp(const char *path, mode_t mode) {
     }
     
     return 0;
-}
-
-char *parse_filename(const char *url) {
-    // Find last occurrence of '/'
-    const char *last_slash = strrchr(url, '/');
-    if (!last_slash) {
-        return NULL;
-    }
-    
-    // Move past the slash to get the filename
-    last_slash++;
-    
-    // Create a new string with the filename
-    char *filename = strdup(last_slash);
-    if (!filename) {
-        return NULL;
-    }
-    
-    return filename;
 }
 
