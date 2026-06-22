@@ -51,4 +51,4 @@ test: cdeps
 	./test.sh
 
 clean:
-	rm -f cdeps cdeps.o luac bin2c cdeps_luac.h cdeps.luac $(LUA_OBJS) $(LUA_DIR)/luac.o
+	rm -f cdeps cdeps.o luac bin2c cdeps.luac $(LUA_OBJS) $(LUA_DIR)/luac.o
