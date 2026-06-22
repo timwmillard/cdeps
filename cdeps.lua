@@ -1,6 +1,6 @@
 -- cdeps.lua — vendored dependency manager (logic layer)
 --
--- This is the "thick" half of cdeps (see PLAN.md). It runs either embedded in
+-- This is the "thick" half of cdeps (see docs/PLAN.md). It runs either embedded in
 -- the C shell (cdeps.c, which preloads the `cdeps_native` module) or directly
 -- under a system `lua` for development. When the native module is absent it
 -- falls back to shelling out to coreutils + shasum, so the whole flow is

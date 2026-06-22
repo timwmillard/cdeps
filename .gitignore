@@ -1,4 +1,4 @@
-# build artifacts — NOT deps/ (that is vendored & committed; see PLAN.md)
+# build artifacts — NOT deps/ (that is vendored & committed; see docs/PLAN.md)
 /cdeps
 /luac
 /bin2c

@@ -1,4 +1,4 @@
--- cdeps' own dependencies — cdeps manages cdeps (dogfood, see PLAN.md).
+-- cdeps' own dependencies — cdeps manages cdeps (dogfood, see docs/PLAN.md).
 --
 -- The only dependency is the Lua runtime cdeps embeds. It was first vendored by
 -- hand (the bootstrap), and is now an ordinary entry: `cdeps update` follows new
