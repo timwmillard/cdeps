@@ -128,6 +128,25 @@ static int l_sha256(lua_State *L) {
     return 1;
 }
 
+static int l_sha256_string(lua_State *L) {
+    size_t len;
+    const char *s = luaL_checklstring(L, 1, &len);
+    sha256_ctx c;
+    sha256_init(&c);
+    sha256_update(&c, (const uint8_t *)s, len);
+    uint8_t digest[32];
+    sha256_final(&c, digest);
+    char hex[65];
+    static const char *hexd = "0123456789abcdef";
+    for (int i = 0; i < 32; i++) {
+        hex[i*2]   = hexd[digest[i] >> 4];
+        hex[i*2+1] = hexd[digest[i] & 0xf];
+    }
+    hex[64] = '\0';
+    lua_pushstring(L, hex);
+    return 1;
+}
+
 static int l_exists(lua_State *L) {
     struct stat st;
     lua_pushboolean(L, stat(luaL_checkstring(L, 1), &st) == 0);
@@ -182,7 +201,8 @@ static int l_walk(lua_State *L) {
 }
 
 static const luaL_Reg cdeps_native_lib[] = {
-    {"sha256",    l_sha256},
+    {"sha256",        l_sha256},
+    {"sha256_string", l_sha256_string},
     {"exists",    l_exists},
     {"isdir",     l_isdir},
     {"mkdirp",    l_mkdirp},

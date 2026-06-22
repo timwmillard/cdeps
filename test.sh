@@ -14,14 +14,20 @@ cat > deps.lua <<'EOF'
 return {
   { "zserge/jsmn", files = { "jsmn.h" } },
   { url = "https://raw.githubusercontent.com/nothings/stb/master/stb_perlin.h" },
+  -- whole-repo vendor (no `files`): locked by tree digest, not a per-file list
+  { url = "https://github.com/octocat/Hello-World.git",
+    commit = "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d" },
 }
 EOF
 
 echo "# sync"
 "$CDEPS"
-test -f deps/jsmn.h        || { echo "FAIL: jsmn.h missing"; exit 1; }
-test -f deps/stb_perlin.h  || { echo "FAIL: stb_perlin.h missing"; exit 1; }
-test -f deps.lock          || { echo "FAIL: deps.lock missing"; exit 1; }
+test -f deps/jsmn.h               || { echo "FAIL: jsmn.h missing"; exit 1; }
+test -f deps/stb_perlin.h         || { echo "FAIL: stb_perlin.h missing"; exit 1; }
+test -f deps/Hello-World/README   || { echo "FAIL: whole-repo tree missing"; exit 1; }
+test -f deps.lock                 || { echo "FAIL: deps.lock missing"; exit 1; }
+grep -q tree_sha256 deps.lock     || { echo "FAIL: tree digest not in lock"; exit 1; }
+grep -q 'README.*sha256' deps.lock && { echo "FAIL: whole-repo wrote a per-file list"; exit 1; }
 
 echo "# verify"
 "$CDEPS" verify
@@ -29,6 +35,11 @@ echo "# verify"
 echo "# tamper detection"
 echo "// tamper" >> deps/jsmn.h
 if "$CDEPS" verify 2>/dev/null; then echo "FAIL: tamper not detected"; exit 1; fi
+
+echo "# tamper detection (whole-repo tree digest)"
+echo "tamper" >> deps/Hello-World/README
+if "$CDEPS" verify 2>/dev/null; then echo "FAIL: tree tamper not detected"; exit 1; fi
+# the dogfood step below (rm -rf deps) restores both tampered trees
 
 echo "# dogfood: rm -rf deps && cdeps restores from lock"
 rm -rf deps

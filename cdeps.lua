@@ -101,6 +101,17 @@ function fs.sha256(path)
   return out:match("^(%x+)")
 end
 
+function fs.sha256_string(s)
+  if native then return native.sha256_string(s) end
+  local tmp = os.tmpname()
+  local f = io.open(tmp, "wb")
+  if not f then return nil end
+  f:write(s); f:close()
+  local h = fs.sha256(tmp)
+  os.remove(tmp)
+  return h
+end
+
 --==========================================================================--
 -- Small utilities
 --==========================================================================--
@@ -246,11 +257,17 @@ local function normalize(spec, cfg)
     end
   end
 
+  -- A git repo vendored without a `files` filter owns its whole (dedicated)
+  -- dest dir. The commit already pins every file's content, so the lock records
+  -- one tree digest for `verify` instead of a per-file hash list.
+  local whole_tree = (transport == "git") and not has_files
+
   return {
     name = name,
     url = url,
     transport = transport,
     files = spec.files,
+    whole_tree = whole_tree,
     dest = dest,
     flatten = (spec.flatten ~= false),
     strip_prefix = spec.strip_prefix,
@@ -456,9 +473,8 @@ local function plan_outputs(s, root)
   return outputs
 end
 
--- copy outputs into dest, return sorted lock file-list {path, sha256}.
-local function vendor_outputs(s, outputs, owned)
-  local files = {}
+-- copy outputs into dest, registering ownership + detecting cross-dep collisions.
+local function copy_outputs(s, outputs, owned)
   for _, o in ipairs(outputs) do
     if owned[o.target] and owned[o.target] ~= s.name then
       die("%s: file collision at %s (also owned by %s) — set a per-dep dest",
@@ -467,11 +483,32 @@ local function vendor_outputs(s, outputs, owned)
     owned[o.target] = s.name
     local ok = fs.copy_file(o.src, o.target)
     if not ok then die("%s: copy failed: %s -> %s", s.name, o.src, o.target) end
-    local hash = fs.sha256(o.target)
-    files[#files + 1] = { path = o.target, sha256 = hash }
+  end
+end
+
+-- sorted lock file-list {path, sha256} for the copied outputs.
+local function hash_outputs(outputs)
+  local files = {}
+  for _, o in ipairs(outputs) do
+    files[#files + 1] = { path = o.target, sha256 = fs.sha256(o.target) }
   end
   table.sort(files, function(a, b) return a.path < b.path end)
   return files
+end
+
+-- Go h1-style dirhash: one sha256 over the sorted "<sha256>  <relpath>" lines of
+-- every file under dir (.git already excluded by fs.walk). Self-contained — no
+-- git needed to recompute — so a single digest stands in for a per-file list
+-- when a dep owns its entire dest tree.
+local function tree_digest(dir)
+  local lines = {}
+  for _, rel in ipairs(fs.walk(dir)) do
+    local h = fs.sha256(join(dir, rel))
+    if not h then return nil end
+    lines[#lines + 1] = h .. "  " .. rel
+  end
+  table.sort(lines)
+  return fs.sha256_string(table.concat(lines, "\n") .. "\n")
 end
 
 -- Run the author-written build hook (after fetch, before hashing).
@@ -515,7 +552,15 @@ local function acquire(s, owned, do_fetch)
 
   run_build_hook(s, root)
 
-  entry.files = vendor_outputs(s, plan_outputs(s, root), owned)
+  local outputs = plan_outputs(s, root)
+  copy_outputs(s, outputs, owned)
+  if s.whole_tree then
+    -- whole-repo vendor: the commit pins content, the dest dir is owned
+    -- wholesale, so one tree digest replaces the per-file list.
+    entry.tree_sha256 = tree_digest(s.dest)
+  else
+    entry.files = hash_outputs(outputs)
+  end
   return entry
 end
 
@@ -549,7 +594,10 @@ function M._serialize_table(tbl, indent)
   end
   table.sort(keys)
   for _, k in ipairs(keys) do
-    parts[#parts + 1] = string.format("%s%s = %s,", ni, k, serialize_value(tbl[k], ni))
+    -- dep names become lock keys; repo names often contain '-' etc, so quote
+    -- anything that isn't a bare Lua identifier (e.g. ["Hello-World"] = ...).
+    local key = k:match("^[%a_][%w_]*$") and k or string.format("[%q]", k)
+    parts[#parts + 1] = string.format("%s%s = %s,", ni, key, serialize_value(tbl[k], ni))
   end
   if #parts == 0 then return "{}" end
   return "{\n" .. table.concat(parts, "\n") .. "\n" .. indent .. "}"
@@ -629,15 +677,24 @@ function M.sync()
 
   for _, s in ipairs(specs) do
     local le = lock[s.name]
-    local all_present = le and le.files and #le.files > 0
-    if all_present then
+    -- present = vendored files already on disk (existence only, like file deps;
+    -- drift detection is `verify`'s job, not sync's).
+    local all_present = false
+    if le and le.tree_sha256 then
+      all_present = fs.isdir(le.dest) and #fs.walk(le.dest) > 0
+    elseif le and le.files and #le.files > 0 then
+      all_present = true
       for _, f in ipairs(le.files) do
         if not fs.exists(f.path) then all_present = false break end
       end
     end
     if all_present then
       info("%s (present)", s.name)
-      for _, f in ipairs(le.files) do owned[f.path] = s.name end
+      if le.tree_sha256 then
+        for _, rel in ipairs(fs.walk(le.dest)) do owned[join(le.dest, rel)] = s.name end
+      else
+        for _, f in ipairs(le.files) do owned[f.path] = s.name end
+      end
       newlock[s.name] = le
     else
       -- reuse pinned commit from lock for reproducibility (floating deps only)
@@ -662,6 +719,12 @@ function M.verify()
     local le = lock[s.name]
     if not le then
       warn("%s: no lock entry", s.name); bad = bad + 1
+    elseif le.tree_sha256 then
+      if not fs.isdir(le.dest) then
+        warn("%s: missing tree %s", s.name, le.dest); bad = bad + 1
+      elseif tree_digest(le.dest) ~= le.tree_sha256 then
+        warn("%s: tree hash mismatch %s", s.name, le.dest); bad = bad + 1
+      end
     else
       for _, f in ipairs(le.files or {}) do
         if not fs.exists(f.path) then
@@ -727,9 +790,14 @@ function M.remove(name)
   local lock = read_lock() or {}
   local le = lock[name]
   if not le then die("no such dep in lock: %s", name) end
-  for _, f in ipairs(le.files or {}) do
-    fs.rmrf(f.path)
-    info("  removed %s", f.path)
+  if le.tree_sha256 then
+    fs.rmrf(le.dest)
+    info("  removed %s", le.dest)
+  else
+    for _, f in ipairs(le.files or {}) do
+      fs.rmrf(f.path)
+      info("  removed %s", f.path)
+    end
   end
   lock[name] = nil
   write_lock(lock)
@@ -745,8 +813,12 @@ function M.tidy()
   for lname, le in pairs(lock) do
     if lname ~= "lockfile_version" and not in_lua[lname] then
       info("dropping stale dep '%s'", lname)
-      for _, f in ipairs(le.files or {}) do
-        fs.rmrf(f.path); info("  removed %s", f.path)
+      if le.tree_sha256 then
+        fs.rmrf(le.dest); info("  removed %s", le.dest)
+      else
+        for _, f in ipairs(le.files or {}) do
+          fs.rmrf(f.path); info("  removed %s", f.path)
+        end
       end
       lock[lname] = nil
     end
@@ -756,7 +828,11 @@ function M.tidy()
   local owned = {}
   for lname, le in pairs(lock) do
     if lname ~= "lockfile_version" then
-      for _, f in ipairs(le.files or {}) do owned[f.path] = true end
+      if le.tree_sha256 then
+        for _, rel in ipairs(fs.walk(le.dest)) do owned[join(le.dest, rel)] = true end
+      else
+        for _, f in ipairs(le.files or {}) do owned[f.path] = true end
+      end
     end
   end
   local destdirs = {}
