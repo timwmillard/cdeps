@@ -1,0 +1,7 @@
+# build artifacts — NOT deps/ (that is vendored & committed; see PLAN.md)
+/cdeps
+/luac
+/bin2c
+/cdeps.luac
+/cdeps_lua.h
+*.o
