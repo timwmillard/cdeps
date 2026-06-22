@@ -245,7 +245,7 @@ end
 
 local function normalize(spec, cfg)
   local url, transport, name = resolve_source(spec)
-  local dir = (cfg and cfg.dir) or "deps"
+  local dir = (cfg and cfg.dir) or "."
   local has_files = spec.files ~= nil and #spec.files > 0
 
   local dest = spec.dest

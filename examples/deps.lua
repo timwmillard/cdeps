@@ -1,8 +1,8 @@
 -- Example cdeps config — a port of ~/cprogs/singlefile_libs/Makefile.
 --
 -- cdeps replaces that Makefile: instead of hand-written `wget -O deps/x.h <url>`
--- rules, you declare deps here and run `cdeps`. Everything lands flat in deps/
--- (the default dest), exactly like the Makefile.
+-- rules, you declare deps here and run `cdeps`. The `config` block below sets
+-- `dir = "deps"` so everything lands flat in deps/, exactly like the Makefile.
 --
 -- Notes vs. the Makefile:
 --   * Branch is auto-detected from the repo's default (master/main), so unlike
@@ -15,10 +15,10 @@
 return {
 
   -- Optional global config (the `config` key; array entries below are the specs).
-  -- `dir` is the base directory all default dest paths are built against. The
-  -- value shown is the default, so this block is inert — set it to e.g. "vendor"
-  -- or "third_party" to relocate everything. Per-entry `dest` still overrides.
-  -- config = { dir = "deps" },
+  -- `dir` is the base directory all default dest paths are built against. It
+  -- defaults to "." (the current dir); set it to e.g. "deps", "vendor", or
+  -- "third_party" to relocate everything. Per-entry `dest` still overrides.
+  config = { dir = "deps" },
 
   ---------------------------------------------------------------- Graphics / UI
   -- multi-file repos: cloning + filtering earns its keep here

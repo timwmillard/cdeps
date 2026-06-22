@@ -12,6 +12,7 @@ cd "$TMP"
 
 cat > deps.lua <<'EOF'
 return {
+  config = { dir = "deps" },   -- default dir is now "."; pin to deps/ for this test
   { "zserge/jsmn", files = { "jsmn.h" } },
   { url = "https://raw.githubusercontent.com/nothings/stb/master/stb_perlin.h" },
   -- whole-repo vendor (no `files`): locked by tree digest, not a per-file list

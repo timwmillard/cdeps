@@ -89,7 +89,7 @@ return {
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver range) | remote default branch HEAD   |
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
-| `dest`         | output dir                                     | `files` set → `<dir>/` (flat); none → `<dir>/<repo>` (tree). `<dir>` = `config.dir`, default `deps` (see Global config) |
+| `dest`         | output dir                                     | `files` set → `<dir>/` (flat); none → `<dir>/<repo>` (tree). `<dir>` = `config.dir`, default `.` (see Global config) |
 | `flatten`      | `false` preserves matched files' subdir paths  | `true` (basename only)          |
 | `submodules`   | git: recurse submodules so their files vendor too | `true` (mirrors Lazy)        |
 | `build`        | `function(ctx)` post-fetch compile/codegen     | none                            |
@@ -113,7 +113,7 @@ return {
 
 | config key | meaning                                  | default  |
 |------------|------------------------------------------|----------|
-| `dir`      | base directory the default `dest` is built against | `"deps"` |
+| `dir`      | base directory the default `dest` is built against | `"."` |
 
 `dir` only fills in the **default** `dest`: `files` present → `<dir>/` (flat);
 none → `<dir>/<repo>` (tree). Keep `config` a small, extensible slot — `dir` is the
@@ -272,7 +272,7 @@ Applied to the fetched tree before copying to `dest`; keep only matches
 ### `dest` & vendoring layout
 
 The default `dest` depends on whether you filter with `files`, because the two
-cases want opposite layouts (`<dir>` = `config.dir`, default `deps`):
+cases want opposite layouts (`<dir>` = `config.dir`, default `.`):
 
 - **`files` present** (picking loose files) → flat into **`<dir>/`**. You want the
   headers loose alongside others (`deps/sokol_gfx.h`).
@@ -285,15 +285,15 @@ local — no effect on fetching/pinning/reproducibility), and an explicit `dest`
 always overrides. (Unlike transport, which is never inferred from `files`.)
 
 ```
--- files present -> flat, default deps/
+-- files present -> flat, default ./
 { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h", "sokol_glue.h" } }
-  -> deps/sokol_app.h, deps/sokol_gfx.h, deps/sokol_glue.h
+  -> ./sokol_app.h, ./sokol_gfx.h, ./sokol_glue.h
 
 { "floooh/sokol", ..., dest = "deps/sokol" }   -> deps/sokol/sokol_gfx.h, …
 { "floooh/sokol", ..., dest = "third_party" }  -> third_party/sokol_gfx.h, …
 
--- no files -> whole repo into deps/<repo>
-{ "raysan5/raylib", tag = "5.5" }   -> deps/raylib/...   (tree preserved)
+-- no files -> whole repo into ./<repo>
+{ "raysan5/raylib", tag = "5.5" }   -> raylib/...   (tree preserved)
 ```
 
 **Nested trees** (e.g. cglm's `include/cglm/*.h`): flattening would collide /
@@ -305,7 +305,7 @@ relative to the fetched root (after `strip_prefix`, for archives):
   -> deps/cglm/include/cglm/vec3.h, …
 ```
 
-**Collisions:** with a shared flat `dest` (the default `deps/`), two deps could
+**Collisions:** with a shared flat `dest` (the default `./`), two deps could
 produce the same filename. Since the lock records every owned file path
 explicitly, cdeps can detect a collision and error rather than silently
 overwrite. The fix is a per-dep `dest` (e.g. `dest = "deps/sokol"`).
@@ -331,8 +331,9 @@ Keys are dep names, quoted when not bare identifiers (`["lua-cjson"] = …`).
 An entry records its vendored content one of two ways:
 
 - **per-file list** (`files`) — when a `files` filter picks loose files into a
-  *shared* dest (`deps/`). The explicit list is how `remove`/`verify`/`tidy` know
-  exactly which files cdeps owns and never clobber a user's file.
+  *shared* dest (the default `.`, the current dir). The explicit list is how
+  `remove`/`verify`/`tidy` know exactly which files cdeps owns and never clobber
+  a user's file.
 - **tree digest** (`tree_sha256`) — when a git repo is vendored *whole* (no
   `files`) into its own dedicated dest dir. The `commit` already pins every file's
   content (a commit SHA is a Merkle root over the full tree), so per-file hashes
@@ -349,11 +350,11 @@ return {
     url    = "https://github.com/floooh/sokol.git",
     branch = "master",          -- intent / tracked branch
     commit = "3c83f4f5…",       -- resolved pin (the Lazy part)
-    dest   = "deps",            -- default flat dest
+    dest   = ".",               -- default flat dest
     files  = {                  -- the vendoring part
-      { path = "deps/sokol_app.h",  sha256 = "ab12…" },
-      { path = "deps/sokol_gfx.h",  sha256 = "cd34…" },
-      { path = "deps/sokol_glue.h", sha256 = "ef56…" },
+      { path = "sokol_app.h",  sha256 = "ab12…" },
+      { path = "sokol_gfx.h",  sha256 = "cd34…" },
+      { path = "sokol_glue.h", sha256 = "ef56…" },
     },
   },
   glm = {                        -- whole git repo -> tree digest, no file list
