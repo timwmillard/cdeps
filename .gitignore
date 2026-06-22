@@ -3,5 +3,4 @@
 /luac
 /bin2c
 /cdeps.luac
-/cdeps_lua.h
 *.o
