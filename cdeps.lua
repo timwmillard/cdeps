@@ -351,7 +351,8 @@ local function git_ensure_clone(s)
   if not fs.isdir(join(cachedir, ".git")) then
     fs.mkdirp(dirname(cachedir))
     info("  cloning %s", s.url)
-    local ok = run("git clone --filter=blob:none --recurse-submodules" ..
+    local ok = run("git clone --filter=blob:none --also-filter-submodules" ..
+      " --recurse-submodules" ..
       " -c core.autocrlf=false " .. shquote(s.url) .. " " .. shquote(cachedir))
     if not ok then die("clone failed: %s", s.url) end
   end
@@ -408,7 +409,7 @@ local function git_checkout(s, cachedir, commit)
   local ok = run("git -C " .. shquote(cachedir) .. " checkout -f " .. shquote(commit) .. " >/dev/null 2>&1")
   if not ok then die("%s: checkout %s failed", s.name, commit:sub(1, 12)) end
   if s.submodules then
-    run("git -C " .. shquote(cachedir) .. " submodule update --init --recursive >/dev/null 2>&1")
+    run("git -C " .. shquote(cachedir) .. " submodule update --init --recursive --filter=blob:none >/dev/null 2>&1")
   end
   return cachedir
 end
