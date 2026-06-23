@@ -13,6 +13,8 @@ CFLAGS  ?= -O2 -Wall
 CFLAGS  += -std=c99
 LIBS    := -lm
 
+PREFIX  ?= /usr/local
+
 # Always build against the VENDORED Lua under deps/ — never the system Lua.
 # We compile + link the Lua sources in $(LUA_DIR) directly (never -llua), and
 # pass this include path FIRST (ahead of an overridable CFLAGS / any CPATH) so
@@ -54,6 +56,9 @@ cdeps_luac.h: cdeps.lua luac bin2c
 # vendored headers even if the source is ever moved out of its own dir.
 %.o: %.c
 	$(CC) $(LUA_INC) $(CFLAGS) -c -o $@ $<
+
+install: cdeps
+	cp cdeps $(PREFIX)/bin/
 
 test: cdeps
 	./test.sh
