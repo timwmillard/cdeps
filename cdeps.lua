@@ -286,6 +286,21 @@ local function is_pinned(s)
   return s.commit ~= nil or s.tag ~= nil or s.version ~= nil
 end
 
+-- Compare two glob lists as order-independent sets (nil == empty). Used by sync
+-- to notice when deps.lua's `files` filter changed since the lock was written.
+local function same_globs(a, b)
+  a, b = a or {}, b or {}
+  if #a ~= #b then return false end
+  local set = {}
+  for _, g in ipairs(a) do set[g] = (set[g] or 0) + 1 end
+  for _, g in ipairs(b) do
+    if not set[g] then return false end
+    set[g] = set[g] - 1
+    if set[g] == 0 then set[g] = nil end
+  end
+  return next(set) == nil
+end
+
 --==========================================================================--
 -- semver (minimal): pick newest tag, or exact / "latest".
 --==========================================================================--
@@ -560,6 +575,9 @@ local function acquire(s, owned, do_fetch)
     entry.tree_sha256 = tree_digest(s.dest)
   else
     entry.files = hash_outputs(outputs)
+    -- remember the requested glob filter so sync can tell when deps.lua adds or
+    -- drops a `files` entry and re-fetch instead of assuming "present".
+    if s.files and #s.files > 0 then entry.spec_files = s.files end
   end
   return entry
 end
@@ -686,6 +704,11 @@ function M.sync()
       all_present = true
       for _, f in ipairs(le.files) do
         if not fs.exists(f.path) then all_present = false break end
+      end
+      -- the lock's file list is only valid for the glob filter it was built from;
+      -- if deps.lua's `files` changed, re-fetch so added globs get vendored.
+      if all_present and not same_globs(le.spec_files, s.files) then
+        all_present = false
       end
     end
     if all_present then
