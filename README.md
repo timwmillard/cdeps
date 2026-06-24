@@ -113,6 +113,7 @@ return {
 |----------------|------------------------------------------------------|--------------------------------|
 | `[1]`          | `"user/repo"` shorthand                              | — (or use `url`)               |
 | `url`          | full URL; overrides the shorthand                    | `https://github.com/<u/r>.git` |
+| `name`         | dep identity: lock key + default `<dir>/<name>` dir  | repo name (git) / repo segment of a GitHub archive URL / filename stem |
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver)      | remote default branch HEAD     |
 | `files`        | glob filter (`**`, `*`); keep only matches           | keep everything                |
 | `dest`         | output dir (literal project-relative path)           | see below                      |
