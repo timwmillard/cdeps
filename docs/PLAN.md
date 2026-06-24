@@ -86,10 +86,11 @@ return {
 |----------------|------------------------------------------------|---------------------------------|
 | `[1]`          | `"user/repo"` shorthand                        | — (or use `url`)                |
 | `url`          | full URL; overrides shorthand                  | `https://github.com/<u/r>.git`  |
+| `name`         | dep identity: lock key + default `<dir>/<name>` dir | repo name (git) / repo segment of a GitHub archive URL / filename stem |
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver range) | remote default branch HEAD   |
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
-| `dest`         | output dir                                     | `files` set → `<dir>/` (flat); none → `<dir>/<repo>` (tree). `<dir>` = `config.dir`, default `.` (see Global config) |
+| `dest`         | output dir                                     | `files` set → `<dir>/` (flat); none → `<dir>/<name>` (tree). `<dir>` = `config.dir`, default `.` (see Global config) |
 | `flatten`      | `false` preserves matched files' subdir paths  | `true` (basename only)          |
 | `submodules`   | git: recurse submodules so their files vendor too | `true` (mirrors Lazy)        |
 | `build`        | `function(ctx)` post-fetch compile/codegen     | none                            |
@@ -116,7 +117,7 @@ return {
 | `dir`      | base directory the default `dest` is built against | `"."` |
 
 `dir` only fills in the **default** `dest`: `files` present → `<dir>/` (flat);
-none → `<dir>/<repo>` (tree). Keep `config` a small, extensible slot — `dir` is the
+none → `<dir>/<name>` (tree). Keep `config` a small, extensible slot — `dir` is the
 only knob now; don't add speculative ones (a global `submodules`/cache path can
 slot in later if a real need appears).
 

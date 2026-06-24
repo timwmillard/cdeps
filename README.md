@@ -129,10 +129,11 @@ git (blobless clone + checkout pin); `.tar.gz`/`.tgz`/`.tar.bz2`/`.zip` → arch
 **Default `dest`** depends on whether you filter with `files`:
 
 - **`files` present** (loose files) → flat into `<dir>/` (e.g. `deps/sokol_gfx.h`).
-- **no `files`** (whole repo) → mirror the tree into `<dir>/<repo>` (e.g.
+- **no `files`** (whole repo) → mirror the tree into `<dir>/<name>` (e.g.
   `deps/raylib/...`, build files and all).
 
-where `<dir>` is `config.dir` (default `.`). A per-entry `dest` overrides entirely.
+where `<dir>` is `config.dir` (default `.`) and `<name>` is the spec's `name`
+(auto-derived if unset). A per-entry `dest` overrides the whole path entirely.
 
 ### Global config
 
