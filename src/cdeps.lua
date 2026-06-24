@@ -223,9 +223,16 @@ local function resolve_source(spec)
     if transport == "git" then
       name = basename(url):gsub("%.git$", "")
     else
-      name = basename(url)
-      name = name:gsub("%.tar%.gz$", ""):gsub("%.tgz$", ""):gsub("%.tar%.bz2$", "")
-                 :gsub("%.tar$", ""):gsub("%.zip$", ""):gsub("%.%w+$", "")
+      -- GitHub "archive" tarballs are named after the tag/ref, not the repo
+      -- (…/raysan5/raylib/archive/refs/tags/6.0.tar.gz → "6.0"). Prefer the repo
+      -- segment so the dep lands in deps/raylib, not deps/6.0.
+      name = url:match("github%.com/[^/]+/([^/]+)/archive/")
+          or url:match("codeload%.github%.com/[^/]+/([^/]+)/")
+      if not name then
+        name = basename(url)
+        name = name:gsub("%.tar%.gz$", ""):gsub("%.tgz$", ""):gsub("%.tar%.bz2$", "")
+                   :gsub("%.tar$", ""):gsub("%.zip$", ""):gsub("%.%w+$", "")
+      end
     end
   end
 
@@ -250,10 +257,10 @@ local function normalize(spec, cfg)
 
   local dest = spec.dest
   if not dest then
-    if has_files or transport ~= "git" then
-      dest = dir            -- flat
+    if has_files or transport == "file" then
+      dest = dir            -- cherry-picked files or a single loose file: flat
     else
-      dest = join(dir, name) -- whole-repo tree
+      dest = join(dir, name) -- whole tree (git repo or archive) -> deps/<name>
     end
   end
 

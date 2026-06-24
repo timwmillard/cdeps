@@ -238,7 +238,7 @@ static int load_logic(lua_State *L) {
      * for logic changes (PLAN: CDEPS_DEV / sibling file). */
     const char *dev = getenv("CDEPS_DEV");
     const char *path = getenv("CDEPS_LUA");
-    if (!path && dev) path = "cdeps.lua";
+    if (!path && dev) path = "src/cdeps.lua";
     if (path) {
         if (luaL_loadfile(L, path) != LUA_OK) return LUA_ERRRUN;
         return LUA_OK;
@@ -248,7 +248,7 @@ static int load_logic(lua_State *L) {
 #else
     /* No embedded bytecode (built without the generated header): fall back to
      * the sibling cdeps.lua so the binary is still usable. */
-    return luaL_loadfile(L, "cdeps.lua");
+    return luaL_loadfile(L, "src/cdeps.lua");
 #endif
 }
 
