@@ -912,7 +912,9 @@ function M.main(argv)
   end
 
   local cmd = args[1]
-  if not cmd or cmd == "install" or cmd == "sync" then
+  if not cmd then
+    M.help()
+  elseif cmd == "install" or cmd == "sync" then
     M.sync()
   elseif cmd == "verify" then
     M.verify()
@@ -925,10 +927,17 @@ function M.main(argv)
   elseif cmd == "add" then
     M.add(args[2])
   elseif cmd == "help" or cmd == "-h" or cmd == "--help" then
-    io.write([[
+    M.help()
+  else
+    die("unknown command: %s (try 'cdeps help')", cmd)
+  end
+end
+
+function M.help()
+  io.write([[
 cdeps — vendored dependency manager
 
-  cdeps [install|sync]      vendor anything in deps.lua missing from the tree
+  cdeps install             vendor anything in deps.lua missing from the tree
   cdeps add <user/repo|url> scaffold a spec, vendor it, update the lock
   cdeps update [name]       re-resolve refs, re-fetch, re-hash, rewrite lock
   cdeps verify              re-hash deps/ against the lock (CI gate)
@@ -936,9 +945,6 @@ cdeps — vendored dependency manager
   cdeps tidy                reconcile deps.lua <-> lock <-> deps/
   -y, --yes                 assume yes for update confirmations
 ]])
-  else
-    die("unknown command: %s (try 'cdeps help')", cmd)
-  end
 end
 
 -- Run as the main chunk: both the system-lua dev path (`lua cdeps.lua …`) and
