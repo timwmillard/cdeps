@@ -120,9 +120,9 @@ return {
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver)      | remote default branch HEAD     |
 | `files`        | glob filter (`**`, `*`); keep only matches           | keep everything                |
 | `dir`          | base dir for *this* entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`)          |
-| `dest`         | output dir (literal project-relative path); overrides `dir`+`subdir` | see below                      |
 | `subdir`       | give this dep its own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
+| `dest`         | **escape hatch:** literal output dir, bypassing `dir`/`subdir`/`name` (see below) | derived from `dir`+`subdir`     |
 | `strip_prefix` | archive: drop a leading path component               | auto (single top-level dir)    |
 | `submodules`   | git: recurse submodules so their files vendor too    | `true`                         |
 | `build`        | `function(ctx)` post-fetch compile/codegen hook      | none                           |
@@ -131,18 +131,28 @@ return {
 git (blobless clone + checkout pin); `.tar.gz`/`.tgz`/`.tar.bz2`/`.zip` → archive
 (download + extract); anything else → file (download single file).
 
-**Default `dest`** is driven by `subdir` (default `true`):
+**Output layout** is built from four composable knobs — `dir`, `name`, `subdir`,
+`flatten` — which together cover essentially every layout you'd want:
 
-- **`subdir = true`** → each dep gets its own folder `<dir>/<name>` (e.g.
-  `deps/sokol/sokol_gfx.h`, `deps/raylib/...`).
-- **`subdir = false`** → all deps land flat in `<dir>/` (e.g. `deps/sokol_gfx.h`).
+- **`dir`** — the base directory (per-entry, else `config.dir`, else `.`).
+- **`name`** — the dep's identity (auto-derived from the URL if unset).
+- **`subdir`** (*inter*-dep layout — a folder per dep):
+  - `true` → each dep gets its own folder `<dir>/<name>` (e.g. `deps/sokol/sokol_gfx.h`,
+    `deps/raylib/...`).
+  - `false` → all deps land flat in `<dir>/` (e.g. `deps/sokol_gfx.h`).
+- **`flatten`** (*intra*-dep layout — what happens to a matched file's own subpath):
+  - `false` → keep the file's path (e.g. `util/sokol_imgui.h` → `<dest>/util/sokol_imgui.h`).
+  - `true` → basename only (e.g. `util/sokol_imgui.h` → `<dest>/sokol_imgui.h`).
 
-where `<dir>` is the entry's `dir` (per-entry, else `config.dir`, else `.`) and
-`<name>` is the spec's `name` (auto-derived if unset). A per-entry `dest` overrides
-the whole path entirely, ignoring `dir`/`subdir`. (`subdir` is the *inter*-dep
-layout — a folder per dep; `flatten` is the *intra*-dep layout — whether a matched
-file keeps its own subpath. They compose: `subdir=true, flatten=true` →
-`deps/sokol/sokol_nuklear.h`.)
+They compose freely: `subdir=true, flatten=true` → `deps/sokol/sokol_nuklear.h`.
+
+**`dest` — the escape hatch.** `dest = "X"` sets the output dir to a *literal* path,
+bypassing `dir`/`subdir`/`name` entirely. It's exactly equivalent to
+`dir = "X", subdir = false`, just shorter and clearer when you want a deliberate,
+hand-placed location (e.g. `dest = "."` to drop a build header at the project root,
+or `dest = "deps/lua-5.5.0"` to pin a folder name that differs from the lock `name`).
+Reach for the four knobs first; use `dest` only when you want to say "put it exactly
+here."
 
 **Splitting one repo across destinations.** To send different files from a single
 repo to different places, use one entry per destination — but give each a distinct

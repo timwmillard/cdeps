@@ -128,11 +128,15 @@ project-wide default for matched files (basename-only when true); a per-entry
 extensible slot — don't add speculative knobs (a global `submodules`/cache path
 can slot in later if a real need appears).
 
-**`dest` precedence:** built-in `"deps"` → `config.dir`+`subdir` set the default →
-per-entry `dest` overrides entirely. A per-entry `dest` is a literal
-project-relative path, **not** relative to `dir` — so deliberate placements stay
-put (e.g. `mate.h`'s `dest = "."` lands in the project root, outside any deps dir,
-which couldn't be expressed if `dest` were forced under `dir`).
+**`dest` precedence:** the layout is built from four composable knobs — `dir`,
+`name`, `subdir`, `flatten` — which cover essentially every scenario. `dest` is an
+**escape hatch**, not the primary knob: `dest = "X"` is exactly equivalent to
+`dir = "X", subdir = false` (a literal project-relative path, **not** relative to
+`dir`/`name`), just shorter and clearer for deliberate placements (e.g. `mate.h`'s
+`dest = "."` at the project root, or the Lua amalgam's `dest = "deps/lua-5.5.0"`
+pinning a folder name distinct from its lock `name = "lua"`). Since per-entry `dir`
+is free-form, `dest` is technically redundant — keep it because the one-field form
+reads as a clear "put it exactly here" override. Reach for the four knobs first.
 
 ## Transport auto-detection (cdeps extension beyond Lazy)
 
@@ -277,12 +281,12 @@ Download directly to `dest` (single or several raw URLs).
 Applied to the fetched tree before copying to `dest`; keep only matches
 (`**`, `*` supported). Omit = keep everything.
 
-### `dest` & vendoring layout
+### Vendoring layout (`dir` / `subdir`, `dest` as escape hatch)
 
-The default `dest` is driven by `subdir` (default `true`), with `<dir>` =
-`config.dir` (default `.`):
+The output location is built from `dir` + `subdir`, with `<dir>` = the entry's
+`dir` (per-entry, else `config.dir`, default `.`):
 
-- **`subdir = true`** → each dep gets its own dir **`<dir>/<name>`**
+- **`subdir = true`** (default) → each dep gets its own dir **`<dir>/<name>`**
   (`deps/sokol/sokol_gfx.h`, `deps/raylib/...`). Keeps deps from one another and
   is the only sane layout for a whole repo (dumping its tree flat into `<dir>/`
   would be a mess).
@@ -290,8 +294,9 @@ The default `dest` is driven by `subdir` (default `true`), with `<dir>` =
   for projects that want every header loose together (the old Makefile style).
 
 This is a *default-only* convenience: it affects output location only (visible,
-local — no effect on fetching/pinning/reproducibility), and an explicit `dest`
-always overrides `dir`+`subdir`. (Unlike transport, which is never inferred.)
+local — no effect on fetching/pinning/reproducibility). `dest` is the escape hatch
+— a literal path that bypasses `dir`/`subdir`/`name`, equivalent to `dir = X,
+subdir = false`. (Unlike transport, which is never inferred.)
 
 ```
 -- subdir = true (default) -> a folder per dep
@@ -302,7 +307,7 @@ always overrides `dir`+`subdir`. (Unlike transport, which is never inferred.)
 -- subdir = false -> flat into <dir>/
 { "floooh/sokol", subdir = false, files = { "sokol_gfx.h" } }  -> deps/sokol_gfx.h
 
--- explicit dest overrides both
+-- dest escape hatch (== dir = "third_party", subdir = false)
 { "floooh/sokol", ..., dest = "third_party" }  -> third_party/sokol_gfx.h, …
 ```
 
