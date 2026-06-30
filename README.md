@@ -15,7 +15,7 @@ return {
 
   { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h", "sokol_glue.h" } },
   { "nothings/stb", files = { "stb_image.h" } },
-  { "recp/cglm", tag = "v0.9.4", files = { "include/**" }, flatten = false },
+  { "recp/cglm", tag = "v0.9.4", files = { "include/**" } },  -- subdir paths preserved (flatten defaults to false)
 }
 ```
 
@@ -89,7 +89,9 @@ return {
   { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h" } },
 
   -- pin: commit > tag > version (semver) > default branch HEAD
-  { "recp/cglm", tag = "v0.9.4", files = { "include/**" }, flatten = false },
+  -- `include/**` keeps its subdir paths (flatten defaults to false); add
+  -- `flatten = true` to vendor matched files by basename only.
+  { "recp/cglm", tag = "v0.9.4", files = { "include/**" } },
   { "g-truc/glm", commit = "0af55cc" },     -- no files -> whole repo into deps/glm
 
   -- full url override (non-github host)
@@ -117,7 +119,7 @@ return {
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver)      | remote default branch HEAD     |
 | `files`        | glob filter (`**`, `*`); keep only matches           | keep everything                |
 | `dest`         | output dir (literal project-relative path)           | see below                      |
-| `flatten`      | `false` preserves matched files' subdir paths        | `true` (basename only)         |
+| `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `strip_prefix` | archive: drop a leading path component               | auto (single top-level dir)    |
 | `submodules`   | git: recurse submodules so their files vendor too    | `true`                         |
 | `build`        | `function(ctx)` post-fetch compile/codegen hook      | none                           |
@@ -137,9 +139,10 @@ where `<dir>` is `config.dir` (default `.`) and `<name>` is the spec's `name`
 
 ### Global config
 
-| config key | meaning                                            | default |
-|------------|----------------------------------------------------|---------|
-| `dir`      | base directory the default `dest` is built against | `"."`   |
+| config key | meaning                                                       | default |
+|------------|---------------------------------------------------------------|---------|
+| `dir`      | base directory the default `dest` is built against            | `"."`   |
+| `flatten`  | default `flatten` for every entry (per-entry `flatten` wins)  | `false` |
 
 ## The lockfile
 

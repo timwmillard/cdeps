@@ -250,6 +250,14 @@ local function parse_git_url(url)
   return host, path
 end
 
+-- Resolve `flatten` for an entry: per-entry value wins, then the global
+-- `config.flatten`, else the default of false (preserve matched subdir paths).
+local function resolve_flatten(spec, cfg)
+  if spec.flatten ~= nil then return spec.flatten end
+  if cfg and cfg.flatten ~= nil then return cfg.flatten end
+  return false
+end
+
 local function normalize(spec, cfg)
   local url, transport, name = resolve_source(spec)
   local dir = (cfg and cfg.dir) or "."
@@ -276,7 +284,10 @@ local function normalize(spec, cfg)
     files = spec.files,
     whole_tree = whole_tree,
     dest = dest,
-    flatten = (spec.flatten ~= false),
+    -- flatten resolution: per-entry overrides global config, which overrides the
+    -- default of false (preserve matched files' subdir paths). Set `flatten = true`
+    -- on an entry (or globally in `config`) to keep only the basename.
+    flatten = resolve_flatten(spec, cfg),
     strip_prefix = spec.strip_prefix,
     submodules = (spec.submodules ~= false),
     branch = spec.branch,

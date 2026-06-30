@@ -91,7 +91,7 @@ return {
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
 | `dest`         | output dir                                     | `files` set → `<dir>/` (flat); none → `<dir>/<name>` (tree). `<dir>` = `config.dir`, default `.` (see Global config) |
-| `flatten`      | `false` preserves matched files' subdir paths  | `true` (basename only)          |
+| `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `submodules`   | git: recurse submodules so their files vendor too | `true` (mirrors Lazy)        |
 | `build`        | `function(ctx)` post-fetch compile/codegen     | none                            |
 
@@ -115,11 +115,13 @@ return {
 | config key | meaning                                  | default  |
 |------------|------------------------------------------|----------|
 | `dir`      | base directory the default `dest` is built against | `"."` |
+| `flatten`  | default `flatten` for every entry (per-entry `flatten` wins) | `false` |
 
 `dir` only fills in the **default** `dest`: `files` present → `<dir>/` (flat);
-none → `<dir>/<name>` (tree). Keep `config` a small, extensible slot — `dir` is the
-only knob now; don't add speculative ones (a global `submodules`/cache path can
-slot in later if a real need appears).
+none → `<dir>/<name>` (tree). `flatten` sets the project-wide default for matched
+files (basename-only when true); a per-entry `flatten` still overrides it. Keep
+`config` a small, extensible slot — don't add speculative knobs (a global
+`submodules`/cache path can slot in later if a real need appears).
 
 **`dest` precedence:** built-in `"deps"` → `config.dir` overrides the base →
 per-entry `dest` overrides entirely. A per-entry `dest` is a literal
@@ -298,11 +300,12 @@ always overrides. (Unlike transport, which is never inferred from `files`.)
 ```
 
 **Nested trees** (e.g. cglm's `include/cglm/*.h`): flattening would collide /
-lose structure, so set `flatten = false` to preserve each matched file's path
-relative to the fetched root (after `strip_prefix`, for archives):
+lose structure, so the default `flatten = false` preserves each matched file's
+path relative to the fetched root (after `strip_prefix`, for archives). Opt into
+`flatten = true` only for flat single-header sets that won't collide on basename:
 
 ```
-{ "recp/cglm", files = { "include/**" }, dest = "deps/cglm", flatten = false }
+{ "recp/cglm", files = { "include/**" }, dest = "deps/cglm" }
   -> deps/cglm/include/cglm/vec3.h, …
 ```
 

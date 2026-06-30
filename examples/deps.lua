@@ -18,7 +18,13 @@ return {
   -- `dir` is the base directory all default dest paths are built against. It
   -- defaults to "." (the current dir); set it to e.g. "deps", "vendor", or
   -- "third_party" to relocate everything. Per-entry `dest` still overrides.
-  config = { dir = "deps" },
+  --
+  -- `flatten` sets the default for every entry. It defaults to false (matched
+  -- files keep their subdir paths). This catalog grabs many single headers from
+  -- subpaths (util/sokol_nuklear.h, sp/sp_asset.h, …) and wants them flat in
+  -- deps/, so it opts in globally. Per-entry `flatten` still overrides (see the
+  -- cimgui entry, which sets `flatten = false` to preserve imgui/).
+  config = { dir = "deps", flatten = true },
 
   ---------------------------------------------------------------- Graphics / UI
   -- multi-file repos: cloning + filtering earns its keep here
