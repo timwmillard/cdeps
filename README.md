@@ -11,11 +11,11 @@ libraries and amalgamations.
 ```lua
 -- deps.lua
 return {
-  config = { dir = "deps" },
+  config = { dir = "deps" },   -- each dep gets its own deps/<name>/ folder (subdir defaults to true)
 
-  { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h", "sokol_glue.h" } },
-  { "nothings/stb", files = { "stb_image.h" } },
-  { "recp/cglm", tag = "v0.9.4", files = { "include/**" } },  -- subdir paths preserved (flatten defaults to false)
+  { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h", "sokol_glue.h" } },  -- -> deps/sokol/*.h
+  { "nothings/stb", files = { "stb_image.h" } },                                 -- -> deps/stb/stb_image.h
+  { "recp/cglm", tag = "v0.9.4", files = { "include/**" } },                     -- -> deps/cglm/include/cglm/*.h
 }
 ```
 
@@ -83,14 +83,15 @@ optional **`config` key** holds global settings (mirrors Lazy's "specs + opts").
 
 ```lua
 return {
-  config = { dir = "deps" },   -- base dir for default dest paths (default ".")
+  -- base dir (default "."); each dep gets its own deps/<name>/ via subdir (default true)
+  config = { dir = "deps" },
 
-  -- github user/repo, default branch, fetch the listed files
+  -- github user/repo, default branch, fetch the listed files -> deps/sokol/*.h
   { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h" } },
 
   -- pin: commit > tag > version (semver) > default branch HEAD
   -- `include/**` keeps its subdir paths (flatten defaults to false); add
-  -- `flatten = true` to vendor matched files by basename only.
+  -- `flatten = true` to vendor matched files by basename only. -> deps/cglm/include/cglm/*
   { "recp/cglm", tag = "v0.9.4", files = { "include/**" } },
   { "g-truc/glm", commit = "0af55cc" },     -- no files -> whole repo into deps/glm
 
@@ -118,7 +119,8 @@ return {
 | `name`         | dep identity: lock key + default `<dir>/<name>` dir  | repo name (git) / repo segment of a GitHub archive URL / filename stem |
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver)      | remote default branch HEAD     |
 | `files`        | glob filter (`**`, `*`); keep only matches           | keep everything                |
-| `dest`         | output dir (literal project-relative path)           | see below                      |
+| `dest`         | output dir (literal project-relative path); overrides `dir`+`subdir` | see below                      |
+| `subdir`       | give this dep its own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `strip_prefix` | archive: drop a leading path component               | auto (single top-level dir)    |
 | `submodules`   | git: recurse submodules so their files vendor too    | `true`                         |
@@ -128,20 +130,24 @@ return {
 git (blobless clone + checkout pin); `.tar.gz`/`.tgz`/`.tar.bz2`/`.zip` → archive
 (download + extract); anything else → file (download single file).
 
-**Default `dest`** depends on whether you filter with `files`:
+**Default `dest`** is driven by `subdir` (default `true`):
 
-- **`files` present** (loose files) → flat into `<dir>/` (e.g. `deps/sokol_gfx.h`).
-- **no `files`** (whole repo) → mirror the tree into `<dir>/<name>` (e.g.
-  `deps/raylib/...`, build files and all).
+- **`subdir = true`** → each dep gets its own folder `<dir>/<name>` (e.g.
+  `deps/sokol/sokol_gfx.h`, `deps/raylib/...`).
+- **`subdir = false`** → all deps land flat in `<dir>/` (e.g. `deps/sokol_gfx.h`).
 
 where `<dir>` is `config.dir` (default `.`) and `<name>` is the spec's `name`
-(auto-derived if unset). A per-entry `dest` overrides the whole path entirely.
+(auto-derived if unset). A per-entry `dest` overrides the whole path entirely,
+ignoring `dir`/`subdir`. (`subdir` is the *inter*-dep layout — a folder per dep;
+`flatten` is the *intra*-dep layout — whether a matched file keeps its own
+subpath. They compose: `subdir=true, flatten=true` → `deps/sokol/sokol_nuklear.h`.)
 
 ### Global config
 
 | config key | meaning                                                       | default |
 |------------|---------------------------------------------------------------|---------|
 | `dir`      | base directory the default `dest` is built against            | `"."`   |
+| `subdir`   | give each dep its own `<dir>/<name>` folder (per-entry `subdir` wins) | `true`  |
 | `flatten`  | default `flatten` for every entry (per-entry `flatten` wins)  | `false` |
 
 ## The lockfile

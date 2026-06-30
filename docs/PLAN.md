@@ -90,7 +90,8 @@ return {
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver range) | remote default branch HEAD   |
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
-| `dest`         | output dir                                     | `files` set → `<dir>/` (flat); none → `<dir>/<name>` (tree). `<dir>` = `config.dir`, default `.` (see Global config) |
+| `dest`         | output dir; overrides `dir`+`subdir` entirely  | `subdir` → `<dir>/<name>`; else `<dir>/` (flat). `<dir>` = `config.dir`, default `.` (see Global config) |
+| `subdir`       | own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `submodules`   | git: recurse submodules so their files vendor too | `true` (mirrors Lazy)        |
 | `build`        | `function(ctx)` post-fetch compile/codegen     | none                            |
@@ -107,7 +108,7 @@ the **`config` key holds settings** (mirrors Lazy's "specs + opts" split):
 return {
   config = { dir = "vendor" },   -- optional; all keys optional
 
-  { "floooh/sokol", files = { "sokol_gfx.h" } },   -- -> vendor/sokol_gfx.h
+  { "floooh/sokol", files = { "sokol_gfx.h" } },   -- -> vendor/sokol/sokol_gfx.h
   { "raysan5/raylib", tag = "5.5" },               -- -> vendor/raylib/...
 }
 ```
@@ -115,15 +116,18 @@ return {
 | config key | meaning                                  | default  |
 |------------|------------------------------------------|----------|
 | `dir`      | base directory the default `dest` is built against | `"."` |
+| `subdir`   | give each dep its own `<dir>/<name>` folder (per-entry `subdir` wins) | `true` |
 | `flatten`  | default `flatten` for every entry (per-entry `flatten` wins) | `false` |
 
-`dir` only fills in the **default** `dest`: `files` present → `<dir>/` (flat);
-none → `<dir>/<name>` (tree). `flatten` sets the project-wide default for matched
-files (basename-only when true); a per-entry `flatten` still overrides it. Keep
-`config` a small, extensible slot — don't add speculative knobs (a global
-`submodules`/cache path can slot in later if a real need appears).
+`dir` + `subdir` fill in the **default** `dest`: `subdir` true → `<dir>/<name>`
+(a folder per dep), false → `<dir>/` (all deps flat together). `flatten` sets the
+project-wide default for matched files (basename-only when true); a per-entry
+`flatten` still overrides it. These two axes are orthogonal — `subdir` is the
+*inter*-dep layout, `flatten` the *intra*-dep one. Keep `config` a small,
+extensible slot — don't add speculative knobs (a global `submodules`/cache path
+can slot in later if a real need appears).
 
-**`dest` precedence:** built-in `"deps"` → `config.dir` overrides the base →
+**`dest` precedence:** built-in `"deps"` → `config.dir`+`subdir` set the default →
 per-entry `dest` overrides entirely. A per-entry `dest` is a literal
 project-relative path, **not** relative to `dir` — so deliberate placements stay
 put (e.g. `mate.h`'s `dest = "."` lands in the project root, outside any deps dir,
@@ -274,29 +278,31 @@ Applied to the fetched tree before copying to `dest`; keep only matches
 
 ### `dest` & vendoring layout
 
-The default `dest` depends on whether you filter with `files`, because the two
-cases want opposite layouts (`<dir>` = `config.dir`, default `.`):
+The default `dest` is driven by `subdir` (default `true`), with `<dir>` =
+`config.dir` (default `.`):
 
-- **`files` present** (picking loose files) → flat into **`<dir>/`**. You want the
-  headers loose alongside others (`deps/sokol_gfx.h`).
-- **no `files`** (vendoring a whole repo) → mirror the tree into **`<dir>/<repo>`**.
-  Dumping a whole repo flat into `<dir>/` would be a mess, so it gets its own dir
-  (`deps/raylib/...`, build files and all).
+- **`subdir = true`** → each dep gets its own dir **`<dir>/<name>`**
+  (`deps/sokol/sokol_gfx.h`, `deps/raylib/...`). Keeps deps from one another and
+  is the only sane layout for a whole repo (dumping its tree flat into `<dir>/`
+  would be a mess).
+- **`subdir = false`** → all deps land flat in **`<dir>/`** (`deps/sokol_gfx.h`),
+  for projects that want every header loose together (the old Makefile style).
 
 This is a *default-only* convenience: it affects output location only (visible,
 local — no effect on fetching/pinning/reproducibility), and an explicit `dest`
-always overrides. (Unlike transport, which is never inferred from `files`.)
+always overrides `dir`+`subdir`. (Unlike transport, which is never inferred.)
 
 ```
--- files present -> flat, default ./
+-- subdir = true (default) -> a folder per dep
 { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h", "sokol_glue.h" } }
-  -> ./sokol_app.h, ./sokol_gfx.h, ./sokol_glue.h
+  -> deps/sokol/sokol_app.h, deps/sokol/sokol_gfx.h, deps/sokol/sokol_glue.h
+{ "raysan5/raylib", tag = "5.5" }   -> deps/raylib/...   (tree preserved)
 
-{ "floooh/sokol", ..., dest = "deps/sokol" }   -> deps/sokol/sokol_gfx.h, …
+-- subdir = false -> flat into <dir>/
+{ "floooh/sokol", subdir = false, files = { "sokol_gfx.h" } }  -> deps/sokol_gfx.h
+
+-- explicit dest overrides both
 { "floooh/sokol", ..., dest = "third_party" }  -> third_party/sokol_gfx.h, …
-
--- no files -> whole repo into ./<repo>
-{ "raysan5/raylib", tag = "5.5" }   -> raylib/...   (tree preserved)
 ```
 
 **Nested trees** (e.g. cglm's `include/cglm/*.h`): flattening would collide /
@@ -309,10 +315,11 @@ path relative to the fetched root (after `strip_prefix`, for archives). Opt into
   -> deps/cglm/include/cglm/vec3.h, …
 ```
 
-**Collisions:** with a shared flat `dest` (the default `./`), two deps could
-produce the same filename. Since the lock records every owned file path
-explicitly, cdeps can detect a collision and error rather than silently
-overwrite. The fix is a per-dep `dest` (e.g. `dest = "deps/sokol"`).
+**Collisions:** with a shared flat `dest` (`subdir = false`, or several deps
+pointing at the same explicit `dest`), two deps could produce the same filename.
+Since the lock records every owned file path explicitly, cdeps can detect a
+collision and error rather than silently overwrite. The fix is the default
+`subdir = true`, or a per-dep `dest` (e.g. `dest = "deps/sokol"`).
 
 ### `build` hook
 

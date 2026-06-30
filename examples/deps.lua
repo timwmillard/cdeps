@@ -19,12 +19,16 @@ return {
   -- defaults to "." (the current dir); set it to e.g. "deps", "vendor", or
   -- "third_party" to relocate everything. Per-entry `dest` still overrides.
   --
+  -- `subdir` defaults to true, giving each dep its own folder <dir>/<name>
+  -- (deps/sokol/…, deps/Nuklear/…). This catalog mirrors a flat Makefile layout —
+  -- every header loose in deps/ — so it sets `subdir = false`.
+  --
   -- `flatten` sets the default for every entry. It defaults to false (matched
-  -- files keep their subdir paths). This catalog grabs many single headers from
-  -- subpaths (util/sokol_nuklear.h, sp/sp_asset.h, …) and wants them flat in
-  -- deps/, so it opts in globally. Per-entry `flatten` still overrides (see the
-  -- cimgui entry, which sets `flatten = false` to preserve imgui/).
-  config = { dir = "deps", flatten = true },
+  -- files keep their subdir paths). With everything flat in deps/, the subpath
+  -- headers (util/sokol_nuklear.h, sp/sp_asset.h, …) want basename-only, so it
+  -- opts in globally. Per-entry `flatten` still overrides (see the cimgui entry,
+  -- which sets `flatten = false` to preserve imgui/).
+  config = { dir = "deps", subdir = false, flatten = true },
 
   ---------------------------------------------------------------- Graphics / UI
   -- multi-file repos: cloning + filtering earns its keep here

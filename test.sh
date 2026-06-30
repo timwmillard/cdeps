@@ -12,17 +12,21 @@ cd "$TMP"
 
 cat > deps.lua <<'EOF'
 return {
-  config = { dir = "deps" },   -- default dir is now "."; pin to deps/ for this test
+  -- default dir is now "."; pin to deps/ for this test. subdir defaults to true
+  -- (a folder per dep); this test asserts flat paths, so opt out with subdir=false.
+  config = { dir = "deps", subdir = false },
   { "zserge/jsmn", files = { "jsmn.h" } },
   { url = "https://raw.githubusercontent.com/nothings/stb/master/stb_perlin.h" },
-  -- whole-repo vendor (no `files`): locked by tree digest, not a per-file list
-  { url = "https://github.com/octocat/Hello-World.git",
+  -- whole-repo vendor (no `files`): locked by tree digest, not a per-file list.
+  -- subdir=true (overriding the global false) so it owns deps/Hello-World/ — a
+  -- tree-digest dep must own its dest dir, not share the flat one.
+  { url = "https://github.com/octocat/Hello-World.git", subdir = true,
     commit = "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d" },
 }
 EOF
 
 echo "# sync"
-"$CDEPS"
+"$CDEPS" install
 test -f deps/jsmn.h               || { echo "FAIL: jsmn.h missing"; exit 1; }
 test -f deps/stb_perlin.h         || { echo "FAIL: stb_perlin.h missing"; exit 1; }
 test -f deps/Hello-World/README   || { echo "FAIL: whole-repo tree missing"; exit 1; }
@@ -42,9 +46,9 @@ echo "tamper" >> deps/Hello-World/README
 if "$CDEPS" verify 2>/dev/null; then echo "FAIL: tree tamper not detected"; exit 1; fi
 # the dogfood step below (rm -rf deps) restores both tampered trees
 
-echo "# dogfood: rm -rf deps && cdeps restores from lock"
+echo "# dogfood: rm -rf deps && cdeps install restores from lock"
 rm -rf deps
-"$CDEPS"
+"$CDEPS" install
 "$CDEPS" verify
 
 echo "# remove"

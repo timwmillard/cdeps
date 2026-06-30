@@ -258,18 +258,26 @@ local function resolve_flatten(spec, cfg)
   return false
 end
 
+-- Resolve `subdir` for an entry: per-entry value wins, then the global
+-- `config.subdir`, else the default of true (each dep gets its own <dir>/<name>).
+local function resolve_subdir(spec, cfg)
+  if spec.subdir ~= nil then return spec.subdir end
+  if cfg and cfg.subdir ~= nil then return cfg.subdir end
+  return true
+end
+
 local function normalize(spec, cfg)
   local url, transport, name = resolve_source(spec)
   local dir = (cfg and cfg.dir) or "."
   local has_files = spec.files ~= nil and #spec.files > 0
 
+  -- dest precedence: an explicit per-entry `dest` overrides everything. Otherwise
+  -- it's derived from `dir` + `subdir`: subdir → <dir>/<name> (a folder per dep),
+  -- else flat into <dir>/ (all deps share the base dir).
+  local subdir = resolve_subdir(spec, cfg)
   local dest = spec.dest
   if not dest then
-    if has_files or transport == "file" then
-      dest = dir            -- cherry-picked files or a single loose file: flat
-    else
-      dest = join(dir, name) -- whole tree (git repo or archive) -> deps/<name>
-    end
+    dest = subdir and join(dir, name) or dir
   end
 
   -- A git repo vendored without a `files` filter owns its whole (dedicated)
