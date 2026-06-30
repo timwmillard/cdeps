@@ -71,7 +71,7 @@ return {
   -- single file (auto-detected from extension): just download
   { url = "https://raw.githubusercontent.com/x/y/master/single.h" },
 
-  -- dest override (with `files`, output is flat in the given dir):
+  -- dest escape hatch: literal path (== dir = "deps/sokol", subdir = false):
   { "floooh/sokol", files = { "sokol_gfx.h" }, dest = "deps/sokol" },   -- -> deps/sokol/sokol_gfx.h
   { "floooh/sokol", files = { "sokol_gfx.h" }, dest = "third_party" },  -- -> third_party/sokol_gfx.h
 
@@ -91,7 +91,7 @@ return {
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
 | `dir`          | base dir for this entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`) |
-| `dest`         | output dir; overrides `dir`+`subdir` entirely  | `subdir` → `<dir>/<name>`; else `<dir>/` (flat). `<dir>` = entry `dir` or `config.dir`, default `.` (see Global config) |
+| `dest`         | escape hatch: literal output dir, bypassing `dir`/`subdir`/`name` (== `dir = X, subdir = false`) | derived from `dir`+`subdir` (see Vendoring layout) |
 | `subdir`       | own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `submodules`   | git: recurse submodules so their files vendor too | `true` (mirrors Lazy)        |
@@ -116,7 +116,7 @@ return {
 
 | config key | meaning                                  | default  |
 |------------|------------------------------------------|----------|
-| `dir`      | base directory the default `dest` is built against | `"."` |
+| `dir`      | base directory the default output layout is built from | `"."` |
 | `subdir`   | give each dep its own `<dir>/<name>` folder (per-entry `subdir` wins) | `true` |
 | `flatten`  | default `flatten` for every entry (per-entry `flatten` wins) | `false` |
 

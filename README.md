@@ -105,7 +105,7 @@ return {
   -- single file: just download
   { url = "https://raw.githubusercontent.com/x/y/master/single.h" },
 
-  -- dest override (with files, output is flat in the given dir)
+  -- dest escape hatch: literal path (== dir = "third_party", subdir = false)
   { "floooh/sokol", files = { "sokol_gfx.h" }, dest = "third_party" },
 }
 ```
@@ -170,7 +170,7 @@ The blobless clone is cached, so the second entry reuses the first's fetch.
 
 | config key | meaning                                                       | default |
 |------------|---------------------------------------------------------------|---------|
-| `dir`      | base directory the default `dest` is built against            | `"."`   |
+| `dir`      | base directory the default output layout is built from        | `"."`   |
 | `subdir`   | give each dep its own `<dir>/<name>` folder (per-entry `subdir` wins) | `true`  |
 | `flatten`  | default `flatten` for every entry (per-entry `flatten` wins)  | `false` |
 
