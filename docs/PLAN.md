@@ -86,11 +86,12 @@ return {
 |----------------|------------------------------------------------|---------------------------------|
 | `[1]`          | `"user/repo"` shorthand                        | — (or use `url`)                |
 | `url`          | full URL; overrides shorthand                  | `https://github.com/<u/r>.git`  |
-| `name`         | dep identity: lock key + default `<dir>/<name>` dir | repo name (git) / repo segment of a GitHub archive URL / filename stem |
+| `name`         | dep identity: lock key + CLI handle + default `<dir>/<name>` dir; **must be unique** (collision is an error) | repo name (git) / repo segment of a GitHub archive URL / filename stem |
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver range) | remote default branch HEAD   |
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
-| `dest`         | output dir; overrides `dir`+`subdir` entirely  | `subdir` → `<dir>/<name>`; else `<dir>/` (flat). `<dir>` = `config.dir`, default `.` (see Global config) |
+| `dir`          | base dir for this entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`) |
+| `dest`         | output dir; overrides `dir`+`subdir` entirely  | `subdir` → `<dir>/<name>`; else `<dir>/` (flat). `<dir>` = entry `dir` or `config.dir`, default `.` (see Global config) |
 | `subdir`       | own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `submodules`   | git: recurse submodules so their files vendor too | `true` (mirrors Lazy)        |

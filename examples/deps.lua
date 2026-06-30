@@ -31,25 +31,30 @@ return {
   config = { dir = "deps", subdir = false, flatten = true },
 
   ---------------------------------------------------------------- Graphics / UI
-  -- multi-file repos: cloning + filtering earns its keep here
+  -- multi-file repos: cloning + filtering earns its keep here. Every sokol header
+  -- comes from this one repo, so it's a SINGLE entry (one `name` = one lock key) —
+  -- the core headers plus the util/ glue headers consumed by nuklear/clay/imgui
+  -- below. All land flat in deps/ (flatten=true, subdir=false).
   { "floooh/sokol", files = {
       "sokol_app.h", "sokol_audio.h", "sokol_gfx.h", "sokol_glue.h",
       "sokol_time.h", "sokol_log.h", "sokol_fetch.h",
+      "util/sokol_nuklear.h",   -- -> deps/sokol_nuklear.h   (used by nuklear below)
+      "util/sokol_fontstash.h", -- -> deps/sokol_fontstash.h (used by clay below)
+      "util/sokol_imgui.h",     -- -> deps/sokol_imgui.h     (used by imgui below)
   } },
 
   { "edubart/sokol_gp", files = { "sokol_gp.h" } },
 
-  -- nuklear: a group spanning two repos -> two entries (both land flat in deps/)
+  -- nuklear: nuklear.h here; its sokol glue (util/sokol_nuklear.h) rides along in
+  -- the sokol entry above (same repo -> same entry, not a duplicate name).
   { "Immediate-Mode-UI/Nuklear", files = { "nuklear.h" } },
-  { "floooh/sokol",              files = { "util/sokol_nuklear.h" } },  -- subpath -> deps/sokol_nuklear.h
 
-  -- clay: clay.h + its sokol renderer (same repo, different paths) + fontstash
+  -- clay: clay.h + its sokol renderer (same repo, different paths). Its fontstash
+  -- glue (util/sokol_fontstash.h) is in the sokol entry above.
   { "nicbarker/clay", files = { "clay.h", "renderers/sokol/sokol_clay.h" } },
-  { "floooh/sokol",   files = { "util/sokol_fontstash.h" } },
 
-  -- Dear ImGui via cimgui + sokol glue.
-  --   * sokol_imgui.h -> deps/   (the sokol+imgui glue header)
-  --   * cimgui (C API) + its Dear ImGui submodule, cloned together -> deps/cimgui/
+  -- Dear ImGui via cimgui. The sokol glue (util/sokol_imgui.h) is in the sokol
+  -- entry above; here we vendor cimgui itself -> deps/cimgui/.
   -- cimgui vendors Dear ImGui as a git submodule at imgui/, pinned by cimgui's
   -- `docking_inter` branch to a specific imgui commit. `submodules = true` makes
   -- the recursive clone materialize that exact imgui, so imgui always matches what
@@ -58,8 +63,6 @@ return {
   -- subpath -> deps/cimgui/imgui/*.
   -- (Alternative: pin ocornut/imgui yourself as a separate `commit =` entry if you
   --  want to control imgui's version independently of cimgui.)
-  { "floooh/sokol", files = { "util/sokol_imgui.h" } },
-
   { "cimgui/cimgui", branch = "docking_inter", submodules = true,
     dest = "deps/cimgui", flatten = false,
     files = {

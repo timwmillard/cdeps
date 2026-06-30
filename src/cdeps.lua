@@ -268,7 +268,9 @@ end
 
 local function normalize(spec, cfg)
   local url, transport, name = resolve_source(spec)
-  local dir = (cfg and cfg.dir) or "."
+  -- base dir: per-entry `dir` overrides `config.dir`, else "." . Unlike `dest`
+  -- (a literal final path), `dir` still feeds the subdir/name derivation below.
+  local dir = spec.dir or (cfg and cfg.dir) or "."
   local has_files = spec.files ~= nil and #spec.files > 0
 
   -- dest precedence: an explicit per-entry `dest` overrides everything. Otherwise
@@ -676,8 +678,18 @@ local function load_specs()
   local t = read_config()
   local cfg = t.config or {}
   local specs = {}
+  local seen = {}
   for _, raw in ipairs(t) do
-    specs[#specs + 1] = normalize(raw, cfg)
+    local s = normalize(raw, cfg)
+    -- `name` is both the lock key and the CLI handle (remove/update <name>), so
+    -- it must be unique. Duplicates would silently overwrite each other in the
+    -- lock; fail loud instead and point at the fix.
+    if seen[s.name] then
+      die("duplicate dep name '%s' — two entries resolve to the same name; "
+        .. "give one a distinct `name`", s.name)
+    end
+    seen[s.name] = true
+    specs[#specs + 1] = s
   end
   return cfg, specs
 end

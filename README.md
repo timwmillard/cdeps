@@ -116,9 +116,10 @@ return {
 |----------------|------------------------------------------------------|--------------------------------|
 | `[1]`          | `"user/repo"` shorthand                              | — (or use `url`)               |
 | `url`          | full URL; overrides the shorthand                    | `https://github.com/<u/r>.git` |
-| `name`         | dep identity: lock key + default `<dir>/<name>` dir  | repo name (git) / repo segment of a GitHub archive URL / filename stem |
+| `name`         | dep identity: lock key + CLI handle + default `<dir>/<name>` dir. **Must be unique** across entries (two entries from one repo each need their own `name`). | repo name (git) / repo segment of a GitHub archive URL / filename stem |
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver)      | remote default branch HEAD     |
 | `files`        | glob filter (`**`, `*`); keep only matches           | keep everything                |
+| `dir`          | base dir for *this* entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`)          |
 | `dest`         | output dir (literal project-relative path); overrides `dir`+`subdir` | see below                      |
 | `subdir`       | give this dep its own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
@@ -136,11 +137,24 @@ git (blobless clone + checkout pin); `.tar.gz`/`.tgz`/`.tar.bz2`/`.zip` → arch
   `deps/sokol/sokol_gfx.h`, `deps/raylib/...`).
 - **`subdir = false`** → all deps land flat in `<dir>/` (e.g. `deps/sokol_gfx.h`).
 
-where `<dir>` is `config.dir` (default `.`) and `<name>` is the spec's `name`
-(auto-derived if unset). A per-entry `dest` overrides the whole path entirely,
-ignoring `dir`/`subdir`. (`subdir` is the *inter*-dep layout — a folder per dep;
-`flatten` is the *intra*-dep layout — whether a matched file keeps its own
-subpath. They compose: `subdir=true, flatten=true` → `deps/sokol/sokol_nuklear.h`.)
+where `<dir>` is the entry's `dir` (per-entry, else `config.dir`, else `.`) and
+`<name>` is the spec's `name` (auto-derived if unset). A per-entry `dest` overrides
+the whole path entirely, ignoring `dir`/`subdir`. (`subdir` is the *inter*-dep
+layout — a folder per dep; `flatten` is the *intra*-dep layout — whether a matched
+file keeps its own subpath. They compose: `subdir=true, flatten=true` →
+`deps/sokol/sokol_nuklear.h`.)
+
+**Splitting one repo across destinations.** To send different files from a single
+repo to different places, use one entry per destination — but give each a distinct
+`name` (the lock key / CLI handle must be unique; cdeps errors on a collision):
+
+```lua
+{ "you/lib", files = { "lib/base.h" } },                       -- -> deps/base.h
+{ "you/lib", name = "lib-tools", dir = "tool",                 -- -> tool/bin2c.c, …
+  files = { "tool/bin2c/bin2c.c", "tool/sql2c/sql2c.c" } },
+```
+
+The blobless clone is cached, so the second entry reuses the first's fetch.
 
 ### Global config
 
