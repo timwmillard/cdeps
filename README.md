@@ -118,6 +118,7 @@ return {
 | `url`          | full URL; overrides the shorthand                    | `https://github.com/<u/r>.git` |
 | `name`         | dep identity: lock key + CLI handle + default `<dir>/<name>` dir. **Must be unique** across entries (two entries from one repo each need their own `name`). | repo name (git) / repo segment of a GitHub archive URL / filename stem |
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver)      | remote default branch HEAD     |
+| `dev`          | local-dev override: copy from this local folder instead of fetching (keeps the declared source as identity) | off (fetch remotely) |
 | `files`        | glob filter (`**`, `*`); keep only matches           | keep everything                |
 | `dir`          | base dir for *this* entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`)          |
 | `subdir`       | give this dep its own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
@@ -165,6 +166,24 @@ repo to different places, use one entry per destination — but give each a dist
 ```
 
 The blobless clone is cached, so the second entry reuses the first's fetch.
+
+**Local development (`dev`).** While hacking on a dependency's own source, point an
+entry at your local checkout with `dev` (à la Lazy.nvim) — cdeps copies from that
+folder instead of fetching:
+
+```lua
+{ "timwmillard/cbase", dev = "~/cprogs/cbase", files = { "lib/base.h" } },
+```
+
+- The declared source (`"timwmillard/cbase"`) stays the dep's identity; `dev` only
+  swaps where the files come from. Remove `dev` and the next `install` fetches the
+  real remote and writes a normal pinned lock entry.
+- `~` and relative paths (from the project root) are supported.
+- It **copies** (cdeps stays a vendoring tool): edit your local source, then re-run
+  `cdeps install` to resync — every run re-copies dev entries.
+- A dev entry isn't a reproducible pin, so the lock records only its paths (marked
+  `dev = "<path>"`, no hashes) and `verify` skips it. Don't commit a `dev` entry as
+  a permanent dependency — it points at a path only you have.
 
 ### Global config
 

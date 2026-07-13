@@ -55,4 +55,23 @@ echo "# remove"
 "$CDEPS" remove stb_perlin
 test ! -f deps/stb_perlin.h || { echo "FAIL: stb_perlin.h not removed"; exit 1; }
 
+echo "# dev: local-folder override (no network)"
+DEVSRC="$TMP/local-cbase"
+mkdir -p "$DEVSRC/lib"
+echo "// base v1" > "$DEVSRC/lib/base.h"
+cat > deps.lua <<EOF
+return {
+  config = { dir = "deps", subdir = false, flatten = true },
+  { "timwmillard/cbase", dev = "$DEVSRC", files = { "lib/base.h" } },
+}
+EOF
+"$CDEPS" install
+grep -q "v1" deps/base.h            || { echo "FAIL: dev file not copied"; exit 1; }
+grep -q 'dev = ' deps.lock          || { echo "FAIL: lock missing dev marker"; exit 1; }
+grep -q 'sha256' deps.lock          && { echo "FAIL: dev entry recorded a hash"; exit 1; }
+echo "// base v2" > "$DEVSRC/lib/base.h"
+"$CDEPS" install                    # re-copies from local on every run
+grep -q "v2" deps/base.h            || { echo "FAIL: dev edit did not resync"; exit 1; }
+"$CDEPS" verify                     # must pass (dev entries are skipped, not hashed)
+
 echo "ALL OK"

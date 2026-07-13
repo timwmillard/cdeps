@@ -88,6 +88,7 @@ return {
 | `url`          | full URL; overrides shorthand                  | `https://github.com/<u/r>.git`  |
 | `name`         | dep identity: lock key + CLI handle + default `<dir>/<name>` dir; **must be unique** (collision is an error) | repo name (git) / repo segment of a GitHub archive URL / filename stem |
 | `branch`/`tag`/`commit`/`version` | the pin (`version` = semver range) | remote default branch HEAD   |
+| `dev`          | local-dev override: copy from this local folder instead of fetching | off (fetch remotely) |
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
 | `dir`          | base dir for this entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`) |
@@ -148,8 +149,23 @@ Lazy is git-only. cdeps picks the transport from the resolved URL, so no explici
 | `.git`, `git@…`, or `user/repo`   | `git`     | clone (blobless) + checkout pin |
 | `.tar.gz`/`.tgz`/`.tar.bz2`/`.zip`| `archive` | download + extract              |
 | any other `…/name.ext`            | `file`    | download single file            |
+| (any, when `dev` is set)          | `local`   | copy from the local `dev` folder |
 
-`files` (glob filter) and `dest` apply uniformly after fetch for all three.
+`files` (glob filter) and `dest`/layout apply uniformly after fetch for all four.
+
+### Local dev override (`dev`, from Lazy)
+
+`dev = "<path>"` on an entry sources from a local folder instead of fetching —
+cdeps sets `transport = "local"` and uses the path as the staging `root`, so
+`files`/`flatten`/`dir`/`subdir`/`dest` all behave identically to a fetched dep.
+The declared `[1]`/`url` (if any) stays the dep's identity; `dev` only swaps the
+source, so removing `dev` restores normal fetching (and a real pinned lock entry).
+We **copy** rather than symlink — cdeps is a vendoring tool, so dev files are real
+files in the tree (build works, no symlink-to-absolute-path footguns); `sync`
+re-copies dev entries every run so local edits propagate. A dev source is local +
+mutable, so it can't be a reproducible pin: the lock records only the vendored
+paths (marked `dev = "<path>"`, no content hashes — stable across edits) and
+`verify` skips dev entries.
 
 ### Shorthand resolution (copy from Lazy `fragments.lua:108`)
 

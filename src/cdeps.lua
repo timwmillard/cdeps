@@ -165,6 +165,13 @@ end
 local HOME = os.getenv("HOME") or "."
 local CACHE_ROOT = (os.getenv("XDG_CACHE_HOME") or (HOME .. "/.cache")) .. "/cdeps"
 
+-- Expand a leading ~ (or ~/) to $HOME. Used by `dev` local-source paths.
+local function expand_path(p)
+  if p == "~" then return HOME end
+  if p:sub(1, 2) == "~/" then return HOME .. p:sub(2) end
+  return p
+end
+
 local function cache_git_dir(host, path)
   return join(join(CACHE_ROOT, "git"), join(host, path))
 end
@@ -206,10 +213,12 @@ local function resolve_source(spec)
       die("spec '%s' is not a user/repo or url", tostring(one))
     end
   end
-  if not url then die("spec missing both [1] and url") end
+  if not url and not spec.dev then die("spec missing both [1] and url") end
 
   local transport
-  if url:match("%.git$") or url:match("^git@") or is_shorthand then
+  if url == nil then
+    transport = "local"   -- dev-only entry: no remote declared, source is `dev`
+  elseif url:match("%.git$") or url:match("^git@") or is_shorthand then
     transport = "git"
   elseif is_archive_url(url) then
     transport = "archive"
@@ -220,7 +229,9 @@ local function resolve_source(spec)
   -- name: repo for git, filename-stem otherwise.
   local name = spec.name
   if not name then
-    if transport == "git" then
+    if transport == "local" then
+      name = basename(expand_path(spec.dev))
+    elseif transport == "git" then
       name = basename(url):gsub("%.git$", "")
     else
       -- GitHub "archive" tarballs are named after the tag/ref, not the repo
@@ -235,6 +246,10 @@ local function resolve_source(spec)
       end
     end
   end
+
+  -- `dev` sources from a local folder instead of fetching, but keeps the declared
+  -- url (if any) as the dep's real identity for when `dev` is later removed.
+  if spec.dev then transport = "local" end
 
   return url, transport, name
 end
@@ -291,6 +306,7 @@ local function normalize(spec, cfg)
     name = name,
     url = url,
     transport = transport,
+    dev = spec.dev and expand_path(spec.dev) or nil,
     files = spec.files,
     whole_tree = whole_tree,
     dest = dest,
@@ -574,7 +590,14 @@ local function acquire(s, owned, do_fetch)
   local entry = { url = s.url, dest = s.dest }
   local root
 
-  if s.transport == "git" then
+  if s.transport == "local" then
+    -- dev override: source straight from a local folder, no fetch.
+    root = s.dev
+    if not fs.isdir(root) then
+      die("%s: dev path is not a directory: %s", s.name, root)
+    end
+    entry.dev = s.dev
+  elseif s.transport == "git" then
     local cachedir = git_ensure_clone(s)
     local need_fetch = do_fetch or s.commit == nil
     local commit, branch = git_resolve(s, cachedir, need_fetch)
@@ -598,7 +621,16 @@ local function acquire(s, owned, do_fetch)
 
   local outputs = plan_outputs(s, root)
   copy_outputs(s, outputs, owned)
-  if s.whole_tree then
+  if s.transport == "local" then
+    -- dev source is local + mutable, so it isn't a reproducible pin: record only
+    -- the vendored paths (for sync re-copy / remove ownership), no content hashes.
+    -- Keeps the lock diff stable as you edit locally; `verify` skips dev entries.
+    local files = {}
+    for _, o in ipairs(outputs) do files[#files + 1] = { path = o.target } end
+    table.sort(files, function(a, b) return a.path < b.path end)
+    entry.files = files
+    if s.files and #s.files > 0 then entry.spec_files = s.files end
+  elseif s.whole_tree then
     -- whole-repo vendor: the commit pins content, the dest dir is owned
     -- wholesale, so one tree digest replaces the per-file list.
     entry.tree_sha256 = tree_digest(s.dest)
@@ -735,9 +767,12 @@ function M.sync()
   for _, s in ipairs(specs) do
     local le = lock[s.name]
     -- present = vendored files already on disk (existence only, like file deps;
-    -- drift detection is `verify`'s job, not sync's).
+    -- drift detection is `verify`'s job, not sync's). dev deps are never "present":
+    -- re-copy every run so local edits propagate into the tree.
     local all_present = false
-    if le and le.tree_sha256 then
+    if s.dev then
+      all_present = false
+    elseif le and le.tree_sha256 then
       all_present = fs.isdir(le.dest) and #fs.walk(le.dest) > 0
     elseif le and le.files and #le.files > 0 then
       all_present = true
@@ -779,7 +814,10 @@ function M.verify()
   local bad = 0
   for _, s in ipairs(specs) do
     local le = lock[s.name]
-    if not le then
+    if s.dev then
+      -- dev deps source from a local, mutable folder — no content pin to check.
+      info("%s (dev, skipped)", s.name)
+    elseif not le then
       warn("%s: no lock entry", s.name); bad = bad + 1
     elseif le.tree_sha256 then
       if not fs.isdir(le.dest) then
