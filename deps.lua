@@ -9,8 +9,21 @@ return {
   -- Official lua.org amalgam (not the lua/lua git mirror): the archive's single
   -- top dir is auto-stripped, then the whole tree is vendored to deps/lua-5.5.0
   -- so the Makefile's -Ideps/lua-5.5.0/src path stays put.
+  --
   {
     url = "https://www.lua.org/ftp/lua-5.5.0.tar.gz",
-    name = "lua", dest = "deps/lua-5.5.0",
+    name = "lua",
+    dir = 'deps',
   },
+  {
+    'timwmillard/cbase',
+    name = 'embedc',
+    dir = '.',
+    subdir = false,
+    flatten = true,
+    files = {
+        'tool/embedc/embedc.c',
+        'tool/embedc/CMakeLists.txt',
+     },
+   },
 }
