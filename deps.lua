@@ -17,13 +17,12 @@ return {
   },
   {
     'timwmillard/cbase',
-    name = 'embedc',
-    dir = '.',
+    name = 'cbase-tool',
+    dir = 'tool',
     subdir = false,
     flatten = true,
     files = {
         'tool/embedc/embedc.c',
-        'tool/embedc/CMakeLists.txt',
      },
    },
 }

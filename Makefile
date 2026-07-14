@@ -4,7 +4,7 @@
 # Dev:   `CDEPS_DEV=1 ./cdeps ...`     (loads cdeps.lua from disk; no rebuild)
 # or:    `lua cdeps.lua ...`           (system lua, shell-based fallbacks)
 
-LUA_DIR  := deps/lua-5.5.0/src
+LUA_DIR  := deps/lua/src
 LUA_SRCS := $(filter-out $(LUA_DIR)/lua.c $(LUA_DIR)/luac.c,$(wildcard $(LUA_DIR)/*.c))
 LUA_OBJS := $(LUA_SRCS:.c=.o)
 
@@ -47,12 +47,12 @@ luac: $(LUA_OBJS) $(LUA_DIR)/luac.o
 	$(CC) $(CFLAGS) -o $@ $(LUA_OBJS) $(LUA_DIR)/luac.o $(LIBS)
 
 # embed cdeps.lua as bytecode via bin2c (symbols: cdeps_luac_data + _len).
-bin2c: $(TOOL_DIR)/bin2c.c
-	$(CC) $(CFLAGS) -o $@ $(TOOL_DIR)/bin2c.c
+embedc: $(TOOL_DIR)/embedc.c
+	$(CC) $(CFLAGS) -o $@ $(TOOL_DIR)/embedc.c
 
-$(SRC_DIR)/cdeps_luac.h: $(SRC_DIR)/cdeps.lua luac bin2c
+$(SRC_DIR)/cdeps_luac.h: $(SRC_DIR)/cdeps.lua luac embedc
 	./luac -o cdeps.luac $(SRC_DIR)/cdeps.lua
-	./bin2c cdeps.luac $@ cdeps_luac
+	./embedc -b cdeps.luac $@ cdeps_luac
 	rm -f cdeps.luac
 
 # Builds the vendored Lua objects (and luac.o). LUA_INC keeps them on the
@@ -67,4 +67,4 @@ test: cdeps
 	./test.sh
 
 clean:
-	rm -f cdeps cdeps.o luac bin2c cdeps.luac $(LUA_OBJS) $(LUA_DIR)/luac.o
+	rm -f cdeps cdeps.o luac embedc cdeps.luac $(LUA_OBJS) $(LUA_DIR)/luac.o
