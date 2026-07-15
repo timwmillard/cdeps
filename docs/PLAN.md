@@ -71,7 +71,7 @@ return {
   -- single file (auto-detected from extension): just download
   { url = "https://raw.githubusercontent.com/x/y/master/single.h" },
 
-  -- dest escape hatch: literal path (== dir = "deps/sokol", subdir = false):
+  -- dest escape hatch: literal path (== dir = "deps/sokol", subdir = ""):
   { "floooh/sokol", files = { "sokol_gfx.h" }, dest = "deps/sokol" },   -- -> deps/sokol/sokol_gfx.h
   { "floooh/sokol", files = { "sokol_gfx.h" }, dest = "third_party" },  -- -> third_party/sokol_gfx.h
 
@@ -92,8 +92,8 @@ return {
 | `files`        | glob filter; keep only matches                 | keep everything                 |
 | `strip_prefix` | archive: drop a leading path component         | none                            |
 | `dir`          | base dir for this entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`) |
-| `dest`         | escape hatch: literal output dir, bypassing `dir`/`subdir`/`name` (== `dir = X, subdir = false`) | derived from `dir`+`subdir` (see Vendoring layout) |
-| `subdir`       | own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
+| `dest`         | escape hatch: literal output dir, bypassing `dir`/`subdir`/`name` (== `dir = X, subdir = ""`) | derived from `dir`+`subdir` (see Vendoring layout) |
+| `subdir`       | folder name under `dir` for this dep; `""` flattens into `<dir>/` directly | the dep's `name`    |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `submodules`   | git: recurse submodules so their files vendor too | `true` (mirrors Lazy)        |
 | `build`        | `function(ctx)` post-fetch compile/codegen     | none                            |
@@ -118,21 +118,25 @@ return {
 | config key | meaning                                  | default  |
 |------------|------------------------------------------|----------|
 | `dir`      | base directory the default output layout is built from | `"."` |
-| `subdir`   | give each dep its own `<dir>/<name>` folder (per-entry `subdir` wins) | `true` |
 | `flatten`  | default `flatten` for every entry (per-entry `flatten` wins) | `false` |
 
-`dir` + `subdir` fill in the **default** `dest`: `subdir` true → `<dir>/<name>`
-(a folder per dep), false → `<dir>/` (all deps flat together). `flatten` sets the
-project-wide default for matched files (basename-only when true); a per-entry
-`flatten` still overrides it. These two axes are orthogonal — `subdir` is the
-*inter*-dep layout, `flatten` the *intra*-dep one. Keep `config` a small,
-extensible slot — don't add speculative knobs (a global `submodules`/cache path
-can slot in later if a real need appears).
+`subdir` is deliberately *not* a global config key: it's a string that defaults to
+the dep's own `name`, and a literal folder name shared across every dep rarely
+means anything useful. Set `subdir = ""` per-entry to opt a dep out of its own
+folder and land it flat in `<dir>/`.
+
+`dir` + `subdir` fill in the **default** `dest`: a non-empty `subdir` → `<dir>/<subdir>`
+(a folder per dep, named after the dep unless overridden), `""` → `<dir>/` (all
+deps flat together). `flatten` sets the project-wide default for matched files
+(basename-only when true); a per-entry `flatten` still overrides it. These two axes
+are orthogonal — `subdir` is the *inter*-dep layout, `flatten` the *intra*-dep one.
+Keep `config` a small, extensible slot — don't add speculative knobs (a global
+`submodules`/cache path can slot in later if a real need appears).
 
 **`dest` precedence:** the layout is built from four composable knobs — `dir`,
 `name`, `subdir`, `flatten` — which cover essentially every scenario. `dest` is an
 **escape hatch**, not the primary knob: `dest = "X"` is exactly equivalent to
-`dir = "X", subdir = false` (a literal project-relative path, **not** relative to
+`dir = "X", subdir = ""` (a literal project-relative path, **not** relative to
 `dir`/`name`), just shorter and clearer for deliberate placements (e.g. `mate.h`'s
 `dest = "."` at the project root, or the Lua amalgam's `dest = "deps/lua-5.5.0"`
 pinning a folder name distinct from its lock `name = "lua"`). Since per-entry `dir`
@@ -300,30 +304,33 @@ Applied to the fetched tree before copying to `dest`; keep only matches
 ### Vendoring layout (`dir` / `subdir`, `dest` as escape hatch)
 
 The output location is built from `dir` + `subdir`, with `<dir>` = the entry's
-`dir` (per-entry, else `config.dir`, default `.`):
+`dir` (per-entry, else `config.dir`, default `.`). `subdir` is a string naming the
+folder under `dir`:
 
-- **`subdir = true`** (default) → each dep gets its own dir **`<dir>/<name>`**
-  (`deps/sokol/sokol_gfx.h`, `deps/raylib/...`). Keeps deps from one another and
-  is the only sane layout for a whole repo (dumping its tree flat into `<dir>/`
-  would be a mess).
-- **`subdir = false`** → all deps land flat in **`<dir>/`** (`deps/sokol_gfx.h`),
+- **unset** (default) → falls back to `name`, so each dep gets its own dir
+  **`<dir>/<name>`** (`deps/sokol/sokol_gfx.h`, `deps/raylib/...`). Keeps deps
+  from one another and is the only sane layout for a whole repo (dumping its
+  tree flat into `<dir>/` would be a mess).
+- **`subdir = ""`** → all deps land flat in **`<dir>/`** (`deps/sokol_gfx.h`),
   for projects that want every header loose together (the old Makefile style).
+- **any other string** → a folder name of your choosing, independent of `name`
+  (e.g. `subdir = "tool"` → `<dir>/tool/...`).
 
 This is a *default-only* convenience: it affects output location only (visible,
 local — no effect on fetching/pinning/reproducibility). `dest` is the escape hatch
 — a literal path that bypasses `dir`/`subdir`/`name`, equivalent to `dir = X,
-subdir = false`. (Unlike transport, which is never inferred.)
+subdir = ""`. (Unlike transport, which is never inferred.)
 
 ```
--- subdir = true (default) -> a folder per dep
+-- subdir unset (default) -> a folder per dep, named after `name`
 { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h", "sokol_glue.h" } }
   -> deps/sokol/sokol_app.h, deps/sokol/sokol_gfx.h, deps/sokol/sokol_glue.h
 { "raysan5/raylib", tag = "5.5" }   -> deps/raylib/...   (tree preserved)
 
--- subdir = false -> flat into <dir>/
-{ "floooh/sokol", subdir = false, files = { "sokol_gfx.h" } }  -> deps/sokol_gfx.h
+-- subdir = "" -> flat into <dir>/
+{ "floooh/sokol", subdir = "", files = { "sokol_gfx.h" } }  -> deps/sokol_gfx.h
 
--- dest escape hatch (== dir = "third_party", subdir = false)
+-- dest escape hatch (== dir = "third_party", subdir = "")
 { "floooh/sokol", ..., dest = "third_party" }  -> third_party/sokol_gfx.h, …
 ```
 
@@ -337,11 +344,12 @@ path relative to the fetched root (after `strip_prefix`, for archives). Opt into
   -> deps/cglm/include/cglm/vec3.h, …
 ```
 
-**Collisions:** with a shared flat `dest` (`subdir = false`, or several deps
+**Collisions:** with a shared flat `dest` (`subdir = ""`, or several deps
 pointing at the same explicit `dest`), two deps could produce the same filename.
 Since the lock records every owned file path explicitly, cdeps can detect a
-collision and error rather than silently overwrite. The fix is the default
-`subdir = true`, or a per-dep `dest` (e.g. `dest = "deps/sokol"`).
+collision and error rather than silently overwrite. The fix is dropping the
+`subdir = ""` override (falling back to the per-dep default), or a per-dep
+`dest` (e.g. `dest = "deps/sokol"`).
 
 ### `build` hook
 

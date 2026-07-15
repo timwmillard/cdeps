@@ -19,23 +19,25 @@ return {
   -- defaults to "." (the current dir); set it to e.g. "deps", "vendor", or
   -- "third_party" to relocate everything. Per-entry `dest` still overrides.
   --
-  -- `subdir` defaults to true, giving each dep its own folder <dir>/<name>
-  -- (deps/sokol/…, deps/Nuklear/…). This catalog mirrors a flat Makefile layout —
-  -- every header loose in deps/ — so it sets `subdir = false`.
+  -- `subdir` defaults to the dep's own `name`, giving each dep its own folder
+  -- <dir>/<name> (deps/sokol/…, deps/Nuklear/…). This catalog mirrors a flat
+  -- Makefile layout — every header loose in deps/ — so every entry below sets
+  -- `subdir = ""` to opt out (the whole-repo entries at the bottom are the
+  -- exception: they keep the default so each gets its own folder).
   --
   -- `flatten` sets the default for every entry. It defaults to false (matched
   -- files keep their subdir paths). With everything flat in deps/, the subpath
   -- headers (util/sokol_nuklear.h, sp/sp_asset.h, …) want basename-only, so it
   -- opts in globally. Per-entry `flatten` still overrides (see the cimgui entry,
   -- which sets `flatten = false` to preserve imgui/).
-  config = { dir = "deps", subdir = false, flatten = true },
+  config = { dir = "deps", flatten = true },
 
   ---------------------------------------------------------------- Graphics / UI
   -- multi-file repos: cloning + filtering earns its keep here. Every sokol header
   -- comes from this one repo, so it's a SINGLE entry (one `name` = one lock key) —
   -- the core headers plus the util/ glue headers consumed by nuklear/clay/imgui
-  -- below. All land flat in deps/ (flatten=true, subdir=false).
-  { "floooh/sokol", files = {
+  -- below. All land flat in deps/ (flatten=true, subdir="").
+  { "floooh/sokol", subdir = "", files = {
       "sokol_app.h", "sokol_audio.h", "sokol_gfx.h", "sokol_glue.h",
       "sokol_time.h", "sokol_log.h", "sokol_fetch.h",
       "util/sokol_nuklear.h",   -- -> deps/sokol_nuklear.h   (used by nuklear below)
@@ -43,15 +45,15 @@ return {
       "util/sokol_imgui.h",     -- -> deps/sokol_imgui.h     (used by imgui below)
   } },
 
-  { "edubart/sokol_gp", files = { "sokol_gp.h" } },
+  { "edubart/sokol_gp", subdir = "", files = { "sokol_gp.h" } },
 
   -- nuklear: nuklear.h here; its sokol glue (util/sokol_nuklear.h) rides along in
   -- the sokol entry above (same repo -> same entry, not a duplicate name).
-  { "Immediate-Mode-UI/Nuklear", files = { "nuklear.h" } },
+  { "Immediate-Mode-UI/Nuklear", subdir = "", files = { "nuklear.h" } },
 
   -- clay: clay.h + its sokol renderer (same repo, different paths). Its fontstash
   -- glue (util/sokol_fontstash.h) is in the sokol entry above.
-  { "nicbarker/clay", files = { "clay.h", "renderers/sokol/sokol_clay.h" } },
+  { "nicbarker/clay", subdir = "", files = { "clay.h", "renderers/sokol/sokol_clay.h" } },
 
   -- Dear ImGui via cimgui. The sokol glue (util/sokol_imgui.h) is in the sokol
   -- entry above; here we vendor cimgui itself -> deps/cimgui/.
@@ -74,50 +76,50 @@ return {
     } },
 
   -- ColleagueRiley stack ("riely" target)
-  { "ColleagueRiley/RGFW",      files = { "RGFW.h" } },
-  { "ColleagueRiley/RSGL",      files = { "RSGL.h" } },
-  { "ColleagueRiley/RFont",     files = { "RFont.h" } },
-  { "ColleagueRiley/Silicon-h", files = { "silicon.h" } },
+  { "ColleagueRiley/RGFW",      subdir = "", files = { "RGFW.h" } },
+  { "ColleagueRiley/RSGL",      subdir = "", files = { "RSGL.h" } },
+  { "ColleagueRiley/RFont",     subdir = "", files = { "RFont.h" } },
+  { "ColleagueRiley/Silicon-h", subdir = "", files = { "silicon.h" } },
 
-  { "nakst/luigi", files = { "experimental/luigi3.h" } },  -- -> deps/luigi3.h
+  { "nakst/luigi", subdir = "", files = { "experimental/luigi3.h" } },  -- -> deps/luigi3.h
 
   ---------------------------------------------------------------------- Audio
-  { "mackron/miniaudio", files = { "miniaudio.h" } },
+  { "mackron/miniaudio", subdir = "", files = { "miniaudio.h" } },
 
   ------------------------------------------------------------ Data / parsing
-  { "nothings/stb", files = {
+  { "nothings/stb", subdir = "", files = {
       "stb_ds.h", "stb_image.h", "stb_truetype.h", "stb_image_write.h",
       "stb_image_resize2.h", "stb_perlin.h", "stb_tilemap_editor.h",
       "stb_textedit.h",
   } },
 
-  { "sheredom/json.h", files = { "json.h" } },
-  { "zserge/jsmn",     files = { "jsmn.h" } },
-  { "tspader/toml",    files = { "toml.h" } },
+  { "sheredom/json.h", subdir = "", files = { "json.h" } },
+  { "zserge/jsmn",     subdir = "", files = { "jsmn.h" } },
+  { "tspader/toml",    subdir = "", files = { "toml.h" } },
 
   -- gitlab source (explicit url overrides the github default).
-  { url = "https://gitlab.com/bztsrc/jsonc.git", files = { "jsonc.c" } },
+  { url = "https://gitlab.com/bztsrc/jsonc.git", subdir = "", files = { "jsonc.c" } },
 
   -- RandyGaul/cute_headers provides several single headers across categories
-  { "RandyGaul/cute_headers", files = { "cute_tiled.h", "cute_tls.h" } },
+  { "RandyGaul/cute_headers", subdir = "", files = { "cute_tiled.h", "cute_tls.h" } },
 
   ----------------------------------------------------------------- Utility
-  { "tsoding/arena",  files = { "arena.h" } },
-  { "tsoding/nob.h",  files = { "nob.h" } },
-  { "tsoding/flag.h", files = { "flag.h" } },
-  { "edubart/minicoro", files = { "minicoro.h" } },
-  { "edubart/minilua",  files = { "minilua.h" } },
-  { "RandyGaul/ckit.h", files = { "ckit.h" } },
+  { "tsoding/arena",  subdir = "", files = { "arena.h" } },
+  { "tsoding/nob.h",  subdir = "", files = { "nob.h" } },
+  { "tsoding/flag.h", subdir = "", files = { "flag.h" } },
+  { "edubart/minicoro", subdir = "", files = { "minicoro.h" } },
+  { "edubart/minilua",  subdir = "", files = { "minilua.h" } },
+  { "RandyGaul/ckit.h", subdir = "", files = { "ckit.h" } },
 
-  { "smcameron/open-simplex-noise-in-c",
+  { "smcameron/open-simplex-noise-in-c", subdir = "",
     files = { "open-simplex-noise.c", "open-simplex-noise.h" } },
 
   -- uuid: two separate upstreams
-  { "wc-duck/uuid_h",  files = { "uuid.h" } },
-  { "LiosK/uuidv7-h",  files = { "uuidv7.h" } },  -- default branch is `main`, auto-detected
+  { "wc-duck/uuid_h",  subdir = "", files = { "uuid.h" } },
+  { "LiosK/uuidv7-h",  subdir = "", files = { "uuidv7.h" } },  -- default branch is `main`, auto-detected
 
   -- sp toolkit: root header + a sp/ subdir of headers (flattened into deps/)
-  { "tspader/sp", files = {
+  { "tspader/sp", subdir = "", files = {
       "sp.h", "sp/sp_asset.h", "sp/sp_elf.h", "sp/sp_glob.h",
       "sp/sp_macho.h", "sp/sp_math.h", "sp/sp_msvc.h", "sp/sp_prompt.h",
   } },
@@ -126,29 +128,34 @@ return {
   { "TomasBorquez/mate.h", files = { "mate.h" }, dest = "." },
 
   ---------------------------------------------------------------- Networking
-  { "erkkah/naett",            files = { "naett.h", "naett.c" } },
-  { "cesanta/mongoose",        files = { "mongoose.h", "mongoose.c" } },
-  { "mattiasgustavsson/libs",  files = { "http.h" } },
+  { "erkkah/naett",            subdir = "", files = { "naett.h", "naett.c" } },
+  { "cesanta/mongoose",        subdir = "", files = { "mongoose.h", "mongoose.c" } },
+  { "mattiasgustavsson/libs",  subdir = "", files = { "http.h" } },
 
   -- release asset: a single .c published on a GitHub release (not in the tree)
-  { url = "https://github.com/OUIsolutions/BearHttpsClient/releases/download/0.2.8/BearHttpsClientOne.c" },
+  { url = "https://github.com/OUIsolutions/BearHttpsClient/releases/download/0.2.8/BearHttpsClientOne.c",
+    subdir = "" },
 
   ------------------------------------------------------------------ Database
   -- sqlite amalgamation zip: extract + flatten the wrapper dir into deps/
-  { url = "https://sqlite.org/2025/sqlite-amalgamation-3500400.zip",
+  { url = "https://sqlite.org/2025/sqlite-amalgamation-3500400.zip", subdir = "",
     files = { "sqlite3.c", "sqlite3.h" } },   -- auto-strip the single top-level dir
 
   -- quickjs amalgamation published as a release zip
-  { url = "https://github.com/quickjs-ng/quickjs/releases/download/v0.13.0/quickjs-amalgam.zip" },
+  { url = "https://github.com/quickjs-ng/quickjs/releases/download/v0.13.0/quickjs-amalgam.zip",
+    subdir = "" },
 
   ------------------------------------------------------------------- Testing
-  { "savashn/myassert", files = { "myassert.h" } },
+  { "savashn/myassert", subdir = "", files = { "myassert.h" } },
 
   ----------------------------------------------- Full C libraries (source trees)
   -- Unlike the single-header libs above, these are whole libraries you compile, so
   -- vendor the ENTIRE repo (no `files` filter): the build files come along too and
   -- a few unused source files don't hurt. With no `files`, dest defaults to
   -- deps/<repo> (the whole tree is mirrored there) — so no explicit dest needed.
+  -- They keep `subdir` at its default (the dep's name) rather than opting into the
+  -- flat layout above: a whole-tree vendor owns its dest dir outright, and sharing
+  -- the flat deps/ with everything else would dump both repos' trees on top of it.
   -- If the repo ships a CMakeLists.txt (e.g. raylib), just
   -- `add_subdirectory(deps/raylib)` from your main CMake; Lua is a handful of .c
   -- you add directly. Pinned to release tags (reproducible).

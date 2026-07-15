@@ -12,15 +12,16 @@ cd "$TMP"
 
 cat > deps.lua <<'EOF'
 return {
-  -- default dir is now "."; pin to deps/ for this test. subdir defaults to true
-  -- (a folder per dep); this test asserts flat paths, so opt out with subdir=false.
-  config = { dir = "deps", subdir = false },
-  { "zserge/jsmn", files = { "jsmn.h" } },
-  { url = "https://raw.githubusercontent.com/nothings/stb/master/stb_perlin.h" },
+  -- default dir is now "."; pin to deps/ for this test. subdir defaults to the
+  -- dep's own name (a folder per dep); this test asserts flat paths for the
+  -- header-only entries, so they opt out with subdir="".
+  config = { dir = "deps" },
+  { "zserge/jsmn", subdir = "", files = { "jsmn.h" } },
+  { url = "https://raw.githubusercontent.com/nothings/stb/master/stb_perlin.h", subdir = "" },
   -- whole-repo vendor (no `files`): locked by tree digest, not a per-file list.
-  -- subdir=true (overriding the global false) so it owns deps/Hello-World/ — a
-  -- tree-digest dep must own its dest dir, not share the flat one.
-  { url = "https://github.com/octocat/Hello-World.git", subdir = true,
+  -- subdir left at its default (dep name) so it owns deps/Hello-World/ — a
+  -- tree-digest dep must own its dest dir, not share a flat one.
+  { url = "https://github.com/octocat/Hello-World.git",
     commit = "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d" },
 }
 EOF
@@ -61,8 +62,8 @@ mkdir -p "$DEVSRC/lib"
 echo "// base v1" > "$DEVSRC/lib/base.h"
 cat > deps.lua <<EOF
 return {
-  config = { dir = "deps", subdir = false, flatten = true },
-  { "timwmillard/cbase", dev = "$DEVSRC", files = { "lib/base.h" } },
+  config = { dir = "deps", flatten = true },
+  { "timwmillard/cbase", dev = "$DEVSRC", subdir = "", files = { "lib/base.h" } },
 }
 EOF
 "$CDEPS" install

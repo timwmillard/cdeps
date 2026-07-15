@@ -19,7 +19,7 @@ return {
     'timwmillard/cbase',
     name = 'cbase-tool',
     dir = 'tool',
-    subdir = false,
+    subdir = '',
     flatten = true,
     files = {
         'tool/embedc/embedc.c',

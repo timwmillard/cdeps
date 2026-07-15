@@ -11,7 +11,7 @@ libraries and amalgamations.
 ```lua
 -- deps.lua
 return {
-  config = { dir = "deps" },   -- each dep gets its own deps/<name>/ folder (subdir defaults to true)
+  config = { dir = "deps" },   -- each dep gets its own deps/<name>/ folder (subdir defaults to the dep's name)
 
   { "floooh/sokol", files = { "sokol_app.h", "sokol_gfx.h", "sokol_glue.h" } },  -- -> deps/sokol/*.h
   { "nothings/stb", files = { "stb_image.h" } },                                 -- -> deps/stb/stb_image.h
@@ -83,7 +83,7 @@ optional **`config` key** holds global settings (mirrors Lazy's "specs + opts").
 
 ```lua
 return {
-  -- base dir (default "."); each dep gets its own deps/<name>/ via subdir (default true)
+  -- base dir (default "."); each dep gets its own deps/<name>/ via subdir (default: the dep's name)
   config = { dir = "deps" },
 
   -- github user/repo, default branch, fetch the listed files -> deps/sokol/*.h
@@ -105,7 +105,7 @@ return {
   -- single file: just download
   { url = "https://raw.githubusercontent.com/x/y/master/single.h" },
 
-  -- dest escape hatch: literal path (== dir = "third_party", subdir = false)
+  -- dest escape hatch: literal path (== dir = "third_party", subdir = "")
   { "floooh/sokol", files = { "sokol_gfx.h" }, dest = "third_party" },
 }
 ```
@@ -121,7 +121,7 @@ return {
 | `dev`          | local-dev override: copy from this local folder instead of fetching (keeps the declared source as identity) | off (fetch remotely) |
 | `files`        | glob filter (`**`, `*`); keep only matches           | keep everything                |
 | `dir`          | base dir for *this* entry; overrides `config.dir`, still feeds `subdir`/`name` | `config.dir` (or `.`)          |
-| `subdir`       | give this dep its own `<dir>/<name>` folder vs. flat into `<dir>/` | `true` (or `config.subdir`)    |
+| `subdir`       | folder name under `dir` for this dep; `""` flattens into `<dir>/` directly | the dep's `name`               |
 | `flatten`      | `true` keeps only the basename; `false` preserves matched files' subdir paths | `false` (or `config.flatten`) |
 | `dest`         | **escape hatch:** literal output dir, bypassing `dir`/`subdir`/`name` (see below) | derived from `dir`+`subdir`     |
 | `strip_prefix` | archive: drop a leading path component               | auto (single top-level dir)    |
@@ -137,19 +137,22 @@ git (blobless clone + checkout pin); `.tar.gz`/`.tgz`/`.tar.bz2`/`.zip` → arch
 
 - **`dir`** — the base directory (per-entry, else `config.dir`, else `.`).
 - **`name`** — the dep's identity (auto-derived from the URL if unset).
-- **`subdir`** (*inter*-dep layout — a folder per dep):
-  - `true` → each dep gets its own folder `<dir>/<name>` (e.g. `deps/sokol/sokol_gfx.h`,
-    `deps/raylib/...`).
-  - `false` → all deps land flat in `<dir>/` (e.g. `deps/sokol_gfx.h`).
+- **`subdir`** (*inter*-dep layout — a folder per dep) — a string naming the
+  folder under `dir`:
+  - unset → defaults to `name`, so each dep gets its own folder `<dir>/<name>`
+    (e.g. `deps/sokol/sokol_gfx.h`, `deps/raylib/...`).
+  - `""` → all deps land flat in `<dir>/` (e.g. `deps/sokol_gfx.h`).
+  - any other string → a folder name of your choosing, e.g. `subdir = "tool"` →
+    `<dir>/tool/...`, independent of `name`.
 - **`flatten`** (*intra*-dep layout — what happens to a matched file's own subpath):
   - `false` → keep the file's path (e.g. `util/sokol_imgui.h` → `<dest>/util/sokol_imgui.h`).
   - `true` → basename only (e.g. `util/sokol_imgui.h` → `<dest>/sokol_imgui.h`).
 
-They compose freely: `subdir=true, flatten=true` → `deps/sokol/sokol_nuklear.h`.
+They compose freely: default `subdir`, `flatten=true` → `deps/sokol/sokol_nuklear.h`.
 
 **`dest` — the escape hatch.** `dest = "X"` sets the output dir to a *literal* path,
 bypassing `dir`/`subdir`/`name` entirely. It's exactly equivalent to
-`dir = "X", subdir = false`, just shorter and clearer when you want a deliberate,
+`dir = "X", subdir = ""`, just shorter and clearer when you want a deliberate,
 hand-placed location (e.g. `dest = "."` to drop a build header at the project root,
 or `dest = "deps/lua-5.5.0"` to pin a folder name that differs from the lock `name`).
 Reach for the four knobs first; use `dest` only when you want to say "put it exactly
@@ -160,8 +163,8 @@ repo to different places, use one entry per destination — but give each a dist
 `name` (the lock key / CLI handle must be unique; cdeps errors on a collision):
 
 ```lua
-{ "you/lib", files = { "lib/base.h" } },                       -- -> deps/base.h
-{ "you/lib", name = "lib-tools", dir = "tool",                 -- -> tool/bin2c.c, …
+{ "you/lib", subdir = "", files = { "lib/base.h" } },                       -- -> deps/base.h
+{ "you/lib", name = "lib-tools", dir = "tool", subdir = "",                 -- -> tool/bin2c.c, …
   files = { "tool/bin2c/bin2c.c", "tool/sql2c/sql2c.c" } },
 ```
 
@@ -190,8 +193,11 @@ folder instead of fetching:
 | config key | meaning                                                       | default |
 |------------|---------------------------------------------------------------|---------|
 | `dir`      | base directory the default output layout is built from        | `"."`   |
-| `subdir`   | give each dep its own `<dir>/<name>` folder (per-entry `subdir` wins) | `true`  |
 | `flatten`  | default `flatten` for every entry (per-entry `flatten` wins)  | `false` |
+
+`subdir` is per-entry only (it defaults to that entry's own `name`, so there's no
+useful shared global value — set `subdir = ""` on individual entries to flatten
+them).
 
 ## The lockfile
 
